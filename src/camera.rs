@@ -28,25 +28,6 @@ impl Camera {
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniform {
-    pub view_proj: [[f32; 4]; 4],
-}
-
-impl CameraUniform {
-    pub fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            view_proj: cgmath::Matrix4::identity().into(),
-        }
-    }
-
-    pub fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_proj = camera.build_view_projection_matrix().into();
-    }
-}
-
 pub struct CameraController {
     speed: f32,
     is_forward_pressed: bool,
@@ -56,7 +37,7 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    fn new(speed: f32) -> Self {
+    pub fn new(speed: f32) -> Self {
         Self {
             speed,
             is_forward_pressed: false,
@@ -66,7 +47,7 @@ impl CameraController {
         }
     }
 
-    fn process_events(&mut self, event: &WindowEvent) -> bool {
+    pub fn process_events(&mut self, event: &WindowEvent) -> bool {
         match event {
             WindowEvent::KeyboardInput {
                 event:
@@ -102,7 +83,7 @@ impl CameraController {
         }
     }
 
-    fn update_camera(&self, camera: &mut Camera) {
+    pub fn update_camera(&self, camera: &mut Camera) {
         use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
         let forward_norm = forward.normalize();
@@ -132,5 +113,24 @@ impl CameraController {
         if self.is_left_pressed {
             camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
         }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CameraUniform {
+    pub view_proj: [[f32; 4]; 4],
+}
+
+impl CameraUniform {
+    pub fn new() -> Self {
+        use cgmath::SquareMatrix;
+        Self {
+            view_proj: cgmath::Matrix4::identity().into(),
+        }
+    }
+
+    pub fn update_view_proj(&mut self, camera: &Camera) {
+        self.view_proj = camera.build_view_projection_matrix().into();
     }
 }

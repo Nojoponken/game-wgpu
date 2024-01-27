@@ -72,6 +72,7 @@ struct State<'w> {
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
     camera: camera::Camera,
+    camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -193,6 +194,8 @@ impl<'w> State<'w> {
             zfar: 100.0,
         };
 
+        let camera_controller = camera::CameraController::new(0.2);
+
         let mut camera_uniform = camera::CameraUniform::new();
         camera_uniform.update_view_proj(&camera);
 
@@ -304,6 +307,7 @@ impl<'w> State<'w> {
             diffuse_bind_group,
             diffuse_texture,
             camera,
+            camera_controller,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -324,21 +328,18 @@ impl<'w> State<'w> {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        state: ElementState::Pressed,
-                        physical_key: PhysicalKey::Code(KeyCode::Space),
-                        ..
-                    },
-                ..
-            } => false,
-            _ => false,
-        }
+        self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {}
+    fn update(&mut self) {
+        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_uniform.update_view_proj(&self.camera);
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+    }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let output = self.surface.get_current_texture()?;
