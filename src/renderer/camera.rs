@@ -101,6 +101,14 @@ impl CameraController {
                         self.pitch_delta = -0.1 * is_pressed as i32 as f32;
                         true
                     }
+                    KeyCode::KeyR => {
+                        self.yaw_delta = 0.1 * is_pressed as i32 as f32;
+                        true
+                    }
+                    KeyCode::KeyF => {
+                        self.yaw_delta = -0.1 * is_pressed as i32 as f32;
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -143,7 +151,11 @@ impl CameraController {
             camera.target -= camera.up * self.speed;
         }
 
-        camera.target = camera.target + right * self.pitch_delta;
+        camera.target += right * self.pitch_delta;
+
+        let up = right.cross(forward.normalize());
+
+        camera.target += up * self.yaw_delta;
     }
 }
 

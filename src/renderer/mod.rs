@@ -7,9 +7,9 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 mod camera;
+mod mesher;
 mod texture;
 mod vertex;
-mod vertexer;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -191,18 +191,18 @@ impl<'w> State<'w> {
                 push_constant_ranges: &[],
             });
 
-        let vertices = vertexer::Vertexer::get_vertices();
+        let vertices = mesher::Mesher::get_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertices),
+            contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         //let num_vertices = VERTICES.len() as u32;
 
-        let indices = vertexer::Vertexer::get_indices();
+        let indices = mesher::Mesher::get_indices();
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(indices),
+            contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
         let num_indices = indices.len() as u32;
