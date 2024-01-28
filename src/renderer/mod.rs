@@ -6,6 +6,10 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowBuilder},
 };
+
+use crate::block;
+
+use self::mesher::Mesh;
 mod camera;
 mod mesher;
 mod texture;
@@ -191,21 +195,28 @@ impl<'w> State<'w> {
                 push_constant_ranges: &[],
             });
 
-        let vertices = mesher::Mesher::get_vertices();
+        let mesh = mesher::get_mesh(
+            [[[super::block::Block {
+                block_id: 0,
+                block_state: 0,
+            }; 16]; 16]; 16],
+        );
+
+        //let vertices = mesher::Mesher::get_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
+            contents: bytemuck::cast_slice(&mesh.vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         //let num_vertices = VERTICES.len() as u32;
 
-        let indices = mesher::Mesher::get_indices();
+        //let indices = mesher::Mesher::get_indices();
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&indices),
+            contents: bytemuck::cast_slice(&mesh.indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let num_indices = indices.len() as u32;
+        let num_indices = mesh.indices.len() as u32;
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),

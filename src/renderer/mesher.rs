@@ -1,168 +1,86 @@
 use super::vertex::*;
-use crate::atlas;
+use crate::atlas::*;
 use crate::block::Block;
-const fn offset_face(face: [u16; 6], offset: u16) -> [u16; 6] {
-    let [a, b, c, d, e, f] = face;
+use crate::terrain::*;
+
+const fn offset_indices(offset: u16) -> [u16; 6] {
+    //let [a, b, c, d, e, f] = face;
     [
-        a + offset,
-        b + offset,
-        c + offset,
-        d + offset,
-        e + offset,
-        f + offset,
+        0 + offset,
+        2 + offset,
+        3 + offset,
+        0 + offset,
+        3 + offset,
+        1 + offset,
     ]
 }
-type Chunk = [[[Block; 16]; 16]; 16];
-/*
 
-    .E------F
-  .' |    .'|
- A---+--B'  |
- |   |  |   |
- |  .G--+---H
- |.'    | .'
- C------D'
-
-*/
-/*
-const TEXTURE_X: f32 = 0.0;
-const TEXTURE_Y: f32 = 0.0625;
-const TEXTURE_SIZE: f32 = 0.0625;
-const TL: [f32; 2] = [TEXTURE_X, TEXTURE_Y];
-const TR: [f32; 2] = [TEXTURE_X + TEXTURE_SIZE, TEXTURE_Y];
-const BL: [f32; 2] = [TEXTURE_X, TEXTURE_Y + TEXTURE_SIZE];
-const BR: [f32; 2] = [TEXTURE_X + TEXTURE_SIZE, TEXTURE_Y + TEXTURE_SIZE];*/
-pub struct Mesher {
-    voxeldata: Chunk,
+const fn get_corner(corner: u8) -> [f32; 3] {
+    match corner {
+        0 => [-0.5, -0.5, -0.5],
+        1 => [-0.5, -0.5, 0.5],
+        2 => [-0.5, 0.5, -0.5],
+        3 => [-0.5, 0.5, 0.5],
+        4 => [0.5, -0.5, -0.5],
+        5 => [0.5, -0.5, 0.5],
+        6 => [0.5, 0.5, -0.5],
+        7 => [0.5, 0.5, 0.5],
+        _ => [0.0, 0.0, 0.0],
+    }
 }
 
-impl Mesher {
-    pub fn new(chunk: Chunk) -> Self {
-        Self { voxeldata: chunk }
-    }
-    pub fn change_block(&mut self, pos: [usize; 3], new_block: Block) {
-        self.voxeldata[pos[0]][pos[1]][pos[2]] = new_block;
-    }
-    pub fn get_vertices() -> [Vertex; 24] {
-        let [tl, tr, bl, br] = atlas::get_texture(atlas::Atlas::MossyCobble);
-        [
-            Vertex {
-                // Front face
-                position: [-0.5, 0.5, 0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [0.5, 0.5, 0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [-0.5, -0.5, 0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [0.5, -0.5, 0.5],
-                tex_coords: br,
-            },
-            Vertex {
-                // Right face
-                position: [0.5, 0.5, 0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [0.5, 0.5, -0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [0.5, -0.5, 0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [0.5, -0.5, -0.5],
-                tex_coords: br,
-            },
-            Vertex {
-                // Back face
-                position: [0.5, 0.5, -0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [-0.5, 0.5, -0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [0.5, -0.5, -0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [-0.5, -0.5, -0.5],
-                tex_coords: br,
-            },
-            Vertex {
-                // Left face
-                position: [-0.5, 0.5, -0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [-0.5, 0.5, 0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [-0.5, -0.5, -0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [-0.5, -0.5, 0.5],
-                tex_coords: br,
-            },
-            Vertex {
-                // Top face
-                position: [-0.5, 0.5, -0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [0.5, 0.5, -0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [-0.5, 0.5, 0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [0.5, 0.5, 0.5],
-                tex_coords: br,
-            },
-            Vertex {
-                // Bottom face
-                position: [-0.5, -0.5, 0.5],
-                tex_coords: tl,
-            },
-            Vertex {
-                position: [0.5, -0.5, 0.5],
-                tex_coords: tr,
-            },
-            Vertex {
-                position: [-0.5, -0.5, -0.5],
-                tex_coords: bl,
-            },
-            Vertex {
-                position: [0.5, -0.5, -0.5],
-                tex_coords: br,
-            },
-        ]
-    }
+fn get_face(face: u8, texture: Atlas) -> [Vertex; 4] {
+    let [tl, tr, bl, br] = get_texture(texture);
 
-    pub fn get_indices() -> [u16; 36] {
-        const generic_face: [u16; 6] = [0, 2, 3, 0, 3, 1];
-        const indices: [u16; 36] = unsafe {
-            std::mem::transmute([
-                generic_face,
-                offset_face(generic_face, 4),
-                offset_face(generic_face, 8),
-                offset_face(generic_face, 12),
-                offset_face(generic_face, 16),
-                offset_face(generic_face, 20),
-            ])
-        };
-        indices
+    let corners = match face {
+        0 => [2, 3, 0, 1],
+        1 => [5, 4, 1, 0],
+        2 => [6, 2, 4, 0],
+        3 => [3, 7, 1, 5],
+        4 => [3, 2, 7, 6],
+        5 => [7, 6, 5, 4],
+        _ => [8, 8, 8, 8],
+    };
+
+    [
+        Vertex {
+            position: get_corner(corners[0]),
+            tex_coords: tl,
+        },
+        Vertex {
+            position: get_corner(corners[1]),
+            tex_coords: tr,
+        },
+        Vertex {
+            position: get_corner(corners[2]),
+            tex_coords: bl,
+        },
+        Vertex {
+            position: get_corner(corners[3]),
+            tex_coords: br,
+        },
+    ]
+}
+
+pub struct Mesh {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u16>,
+}
+pub fn get_mesh(voxeldata: Chunk) -> Mesh {
+    let mut verts: Vec<Vertex> = get_face(0, Atlas::MossyCobble).into();
+    verts.extend(get_face(1, Atlas::MossyCobble));
+    verts.extend(get_face(2, Atlas::MossyCobble));
+    verts.extend(get_face(3, Atlas::MossyCobble));
+    verts.extend(get_face(4, Atlas::MossyCobble));
+    verts.extend(get_face(5, Atlas::MossyCobble));
+    let mut inds: Vec<u16> = offset_indices(0).into();
+    inds.extend(offset_indices(4));
+    inds.extend(offset_indices(8));
+    inds.extend(offset_indices(12));
+    inds.extend(offset_indices(16));
+    inds.extend(offset_indices(20));
+    Mesh {
+        vertices: verts,
+        indices: inds,
     }
 }

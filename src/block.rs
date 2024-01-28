@@ -1,6 +1,5 @@
-pub struct BlockId(u8);
-pub struct BlockState(u8);
+#[derive(Debug, Copy, Clone)]
 pub struct Block {
-    pub block_id: BlockId,
-    pub block_state: BlockState,
+    pub block_id: u8,
+    pub block_state: u8,
 }
