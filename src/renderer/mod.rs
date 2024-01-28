@@ -8,55 +8,8 @@ use winit::{
 };
 mod camera;
 mod texture;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    tex_coords: [f32; 2],
-}
-impl Vertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x2,
-                },
-            ],
-        }
-    }
-}
-
-// lib.rs
-const VERTICES: &[Vertex] = &[
-    Vertex {
-        position: [-0.5, -0.5, 0.0],
-        tex_coords: [0.25, 0.0625],
-    }, // A
-    Vertex {
-        position: [0.5, -0.5, 0.0],
-        tex_coords: [0.1875, 0.0625],
-    }, // B
-    Vertex {
-        position: [-0.5, 0.5, 0.0],
-        tex_coords: [0.25, 0.0],
-    }, // C
-    Vertex {
-        position: [0.5, 0.5, 0.0],
-        tex_coords: [0.1875, 0.0],
-    }, // D
-];
-
-const INDICES: &[u16] = &[1, 2, 0, 3, 2, 1];
+mod vertex;
+mod vertexer;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -140,7 +93,7 @@ impl<'w> State<'w> {
         surface.configure(&device, &config);
 
         surface.configure(&device, &config);
-        let diffuse_bytes = include_bytes!("atlas.png");
+        let diffuse_bytes = include_bytes!("../../assets/atlas.png");
         let diffuse_texture =
             texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "atlas.png").unwrap();
 
@@ -238,19 +191,21 @@ impl<'w> State<'w> {
                 push_constant_ranges: &[],
             });
 
+        let vertices = vertexer::Vertexer::get_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
+            contents: bytemuck::cast_slice(vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         //let num_vertices = VERTICES.len() as u32;
 
+        let indices = vertexer::Vertexer::get_indices();
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
+            contents: bytemuck::cast_slice(indices),
             usage: wgpu::BufferUsages::INDEX,
         });
-        let num_indices = INDICES.len() as u32;
+        let num_indices = indices.len() as u32;
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
@@ -258,7 +213,7 @@ impl<'w> State<'w> {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                buffers: &[vertex::Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 // 3.

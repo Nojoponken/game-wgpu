@@ -1,3 +1,4 @@
+use cgmath::InnerSpace;
 use winit::event::*;
 use winit::keyboard::*;
 
@@ -34,6 +35,10 @@ pub struct CameraController {
     is_backward_pressed: bool,
     is_left_pressed: bool,
     is_right_pressed: bool,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
+    yaw_delta: f32,
+    pitch_delta: f32,
 }
 
 impl CameraController {
@@ -44,6 +49,10 @@ impl CameraController {
             is_backward_pressed: false,
             is_left_pressed: false,
             is_right_pressed: false,
+            is_up_pressed: false,
+            is_down_pressed: false,
+            yaw_delta: 0.0,
+            pitch_delta: 0.0,
         }
     }
 
@@ -76,6 +85,22 @@ impl CameraController {
                         self.is_right_pressed = is_pressed;
                         true
                     }
+                    KeyCode::Space => {
+                        self.is_up_pressed = is_pressed;
+                        true
+                    }
+                    KeyCode::ShiftLeft => {
+                        self.is_down_pressed = is_pressed;
+                        true
+                    }
+                    KeyCode::KeyE => {
+                        self.pitch_delta = 0.1 * is_pressed as i32 as f32;
+                        true
+                    }
+                    KeyCode::KeyQ => {
+                        self.pitch_delta = -0.1 * is_pressed as i32 as f32;
+                        true
+                    }
                     _ => false,
                 }
             }
@@ -84,35 +109,41 @@ impl CameraController {
     }
 
     pub fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
         let forward = camera.target - camera.eye;
-        let forward_norm = forward.normalize();
-        let forward_mag = forward.magnitude();
+        let forward_norm = cgmath::Vector3::new(forward.x, 0.0, forward.z).normalize();
 
         // Prevents glitching when the camera gets too close to the
         // center of the scene.
-        if self.is_forward_pressed && forward_mag > self.speed {
+        if self.is_forward_pressed {
             camera.eye += forward_norm * self.speed;
+            camera.target += forward_norm * self.speed;
         }
         if self.is_backward_pressed {
             camera.eye -= forward_norm * self.speed;
+            camera.target -= forward_norm * self.speed;
         }
 
         let right = forward_norm.cross(camera.up);
 
-        // Redo radius calc in case the forward/backward is pressed.
-        let forward = camera.target - camera.eye;
-        let forward_mag = forward.magnitude();
-
         if self.is_right_pressed {
-            // Rescale the distance between the target and the eye so
-            // that it doesn't change. The eye, therefore, still
-            // lies on the circle made by the target and eye.
-            camera.eye = camera.target - (forward + right * self.speed).normalize() * forward_mag;
+            camera.eye += right * self.speed;
+            camera.target += right * self.speed;
         }
         if self.is_left_pressed {
-            camera.eye = camera.target - (forward - right * self.speed).normalize() * forward_mag;
+            camera.eye -= right * self.speed;
+            camera.target -= right * self.speed;
         }
+
+        if self.is_up_pressed {
+            camera.eye += camera.up * self.speed;
+            camera.target += camera.up * self.speed;
+        }
+        if self.is_down_pressed {
+            camera.eye -= camera.up * self.speed;
+            camera.target -= camera.up * self.speed;
+        }
+
+        camera.target = camera.target + right * self.pitch_delta;
     }
 }
 
