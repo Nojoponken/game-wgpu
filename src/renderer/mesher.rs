@@ -122,7 +122,7 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
             for z in 0..16 {
                 if voxeldata[x][y][z].block_id != 0 {
                     for face in 0..6 {
-                        let mut neighbor = false;
+                        let neighbor;
 
                         let x_border = (x == 0 && face == 0) || (x == 15 && face == 1);
                         let y_border = (y == 0 && face == 2) || (y == 15 && face == 3);
