@@ -22,6 +22,7 @@ pub fn get_texture(origin: Atlas) -> [[f32; 2]; 4] {
         Atlas::Stone => [0.0625, 0.0],
         Atlas::Dirt => [0.125, 0.0],
         Atlas::MossyCobble => [0.25, 0.125],
+        Atlas::StoneSlabTop => [0.375, 0.0],
         _ => [0.875, 0.0625],
     };
     [

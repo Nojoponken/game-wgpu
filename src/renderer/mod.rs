@@ -7,7 +7,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use crate::block;
+use crate::{block, terrain};
 
 use self::mesher::Mesh;
 mod camera;
@@ -28,6 +28,7 @@ struct State<'w> {
     num_indices: u32,
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
+    depth_texture: texture::Texture,
     camera: camera::Camera,
     camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
@@ -195,12 +196,7 @@ impl<'w> State<'w> {
                 push_constant_ranges: &[],
             });
 
-        let mesh = mesher::get_mesh(
-            [[[super::block::Block {
-                block_id: 0,
-                block_state: 0,
-            }; 16]; 16]; 16],
-        );
+        let mesh = mesher::get_mesh(terrain::get_chunk(0, 0));
 
         //let vertices = mesher::Mesher::get_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -217,6 +213,9 @@ impl<'w> State<'w> {
             usage: wgpu::BufferUsages::INDEX,
         });
         let num_indices = mesh.indices.len() as u32;
+
+        let depth_texture =
+            texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
@@ -249,7 +248,13 @@ impl<'w> State<'w> {
                 // Requires Features::CONSERVATIVE_RASTERIZATION
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less, // 1.
+                stencil: wgpu::StencilState::default(),     // 2.
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -272,6 +277,7 @@ impl<'w> State<'w> {
             num_indices,
             diffuse_bind_group,
             diffuse_texture,
+            depth_texture,
             camera,
             camera_controller,
             camera_uniform,
@@ -290,6 +296,8 @@ impl<'w> State<'w> {
             self.config.width = new_size.width;
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
+            self.depth_texture =
+                texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
         }
     }
 
@@ -338,7 +346,14 @@ impl<'w> State<'w> {
                         },
                     }),
                 ],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
