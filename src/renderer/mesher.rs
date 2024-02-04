@@ -1,111 +1,128 @@
 use super::vertex::*;
-use crate::block::Block;
+use crate::atlas::*;
 use crate::terrain::*;
-use crate::{atlas::*, block};
-use log::info;
+use cgmath::Vector3;
 
-const fn offset_indices(offset: u16) -> [u16; 6] {
+fn offset_indices(offset: u16, flip: bool) -> [u16; 6] {
     //let [a, b, c, d, e, f] = face;
-    [
+    let mut ret = [
         0 + offset,
         2 + offset,
         3 + offset,
         0 + offset,
         3 + offset,
         1 + offset,
+    ];
+    if flip {
+        ret.reverse();
+    }
+    ret
+}
+
+fn get_corners(normal: Vector3<f32>, position: Vector3<f32>) -> [[f32; 3]; 4] {
+    let half = normal * 0.5;
+    let middle = position + half;
+    [
+        [
+            middle.x + half.y + half.z,
+            middle.y + half.z + half.x,
+            middle.z + half.x + half.y,
+        ],
+        [
+            middle.x - half.y + half.z,
+            middle.y - half.z + half.x,
+            middle.z - half.x + half.y,
+        ],
+        [
+            middle.x + half.y - half.z,
+            middle.y + half.z - half.x,
+            middle.z + half.x - half.y,
+        ],
+        [
+            middle.x - half.y - half.z,
+            middle.y - half.z - half.x,
+            middle.z - half.x - half.y,
+        ],
     ]
 }
 
-fn get_corner(corner: u8, coordinates: [f32; 3]) -> [f32; 3] {
-    match corner {
-        0 => [
-            -0.5 + coordinates[0],
-            -0.5 + coordinates[1],
-            -0.5 + coordinates[2],
-        ],
-        1 => [
-            -0.5 + coordinates[0],
-            -0.5 + coordinates[1],
-            0.5 + coordinates[2],
-        ],
-        2 => [
-            -0.5 + coordinates[0],
-            0.5 + coordinates[1],
-            -0.5 + coordinates[2],
-        ],
-        3 => [
-            -0.5 + coordinates[0],
-            0.5 + coordinates[1],
-            0.5 + coordinates[2],
-        ],
-        4 => [
-            0.5 + coordinates[0],
-            -0.5 + coordinates[1],
-            -0.5 + coordinates[2],
-        ],
-        5 => [
-            0.5 + coordinates[0],
-            -0.5 + coordinates[1],
-            0.5 + coordinates[2],
-        ],
-        6 => [
-            0.5 + coordinates[0],
-            0.5 + coordinates[1],
-            -0.5 + coordinates[2],
-        ],
-        7 => [
-            0.5 + coordinates[0],
-            0.5 + coordinates[1],
-            0.5 + coordinates[2],
-        ],
-        _ => [0.0, 0.0, 0.0],
-    }
-}
-
-fn get_face(face: u8, texture: Atlas, coordinates: [f32; 3]) -> [Vertex; 4] {
+fn get_face(
+    face: u8,
+    normal: Vector3<f32>,
+    texture: Atlas,
+    coordinates: [f32; 3],
+    occluders: [f32; 8],
+) -> [Vertex; 4] {
     let [tl, tr, bl, br] = get_texture(texture);
+    let [tlc, trc, blc, brc] = get_corners(
+        normal,
+        Vector3 {
+            x: coordinates[0],
+            y: coordinates[1],
+            z: coordinates[2],
+        },
+    );
 
-    let corners = match face {
-        0 => [2, 3, 0, 1],
-        1 => [7, 6, 5, 4],
-        2 => [5, 4, 1, 0],
-        3 => [3, 2, 7, 6],
-        4 => [6, 2, 4, 0],
-        5 => [3, 7, 1, 5],
-        _ => [8, 8, 8, 8],
-    };
+    let normal_dir = [normal.x, normal.y, normal.z];
 
     [
         Vertex {
-            position: get_corner(corners[0], coordinates),
+            position: tlc,
             tex_coords: tl,
+            normal: normal_dir,
+            ao: occluders[0] + occluders[1] + occluders[2],
         },
         Vertex {
-            position: get_corner(corners[1], coordinates),
+            position: trc,
             tex_coords: tr,
+            normal: normal_dir,
+            ao: occluders[2] + occluders[3] + occluders[4],
         },
         Vertex {
-            position: get_corner(corners[2], coordinates),
+            position: blc,
             tex_coords: bl,
+            normal: normal_dir,
+            ao: occluders[6] + occluders[7] + occluders[0],
         },
         Vertex {
-            position: get_corner(corners[3], coordinates),
+            position: brc,
             tex_coords: br,
+            normal: normal_dir,
+            ao: occluders[4] + occluders[5] + occluders[6],
         },
     ]
 }
 
-fn get_neighbor(current: [usize; 3], face: u8) -> [usize; 3] {
-    let [x, y, z] = current;
+fn get_occluders(position: Vector3<f32>, normal: Vector3<f32>) -> [Vector3<f32>; 8] {
+    let h = Vector3 {
+        x: normal.y,
+        y: normal.z,
+        z: normal.x,
+    };
 
-    match face {
-        0 => [x - 1, y, z],
-        1 => [x + 1, y, z],
-        2 => [x, y - 1, z],
-        3 => [x, y + 1, z],
-        4 => [x, y, z - 1],
-        5 => [x, y, z + 1],
-        _ => [x, y, z],
+    let v = Vector3 {
+        x: normal.z,
+        y: normal.x,
+        z: normal.y,
+    };
+
+    [
+        position + h,
+        position + h + v,
+        position + v,
+        position + v - h,
+        position - h,
+        position - h - v,
+        position - v,
+        position - v + h,
+    ]
+}
+
+fn get_normal(face: u8) -> Vector3<f32> {
+    Vector3 {
+        x: (face == 1) as u8 as f32 - (face == 0) as u8 as f32,
+        y: (face == 3) as u8 as f32 - (face == 2) as u8 as f32,
+        z: (face == 5) as u8 as f32 - (face == 4) as u8 as f32,
     }
 }
 
@@ -117,32 +134,63 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
     let mut verts: Vec<Vertex> = Vec::new();
     let mut inds: Vec<u16> = Vec::new();
     let mut off: u16 = 0;
-    for x in 0..16 {
-        for y in 0..16 {
-            for z in 0..16 {
+    for x in 0..CHUNK_SIZE {
+        for y in 0..CHUNK_SIZE {
+            for z in 0..CHUNK_SIZE {
                 if voxeldata[x][y][z].block_id != 0 {
                     for face in 0..6 {
-                        let neighbor;
+                        let normal = get_normal(face);
 
-                        let x_border = (x == 0 && face == 0) || (x == 15 && face == 1);
-                        let y_border = (y == 0 && face == 2) || (y == 15 && face == 3);
-                        let z_border = (z == 0 && face == 4) || (z == 15 && face == 5);
+                        let mut occluders: [f32; 8] = [0.33; 8];
+
+                        let x_border = (x == 0 && face == 0) || (x == CHUNK_SIZE - 1 && face == 1);
+                        let y_border = (y == 0 && face == 2) || (y == CHUNK_SIZE - 1 && face == 3);
+                        let z_border = (z == 0 && face == 4) || (z == CHUNK_SIZE - 1 && face == 5);
+
                         if x_border || y_border || z_border {
-                            neighbor = false;
-                        } else {
-                            let [nx, ny, nz] = get_neighbor([x, y, z], face);
-                            neighbor = voxeldata[nx][ny][nz].block_id != 0;
+                            continue;
+                        }
+                        let neighbor_position = Vector3 {
+                            x: x as f32,
+                            y: y as f32,
+                            z: z as f32,
+                        } + normal; //hhget_neighbor([x, y, z], face);
+
+                        if voxeldata[neighbor_position.x as usize][neighbor_position.y as usize]
+                            [neighbor_position.z as usize]
+                            .block_id
+                            != 0
+                        {
+                            continue;
                         }
 
-                        if !neighbor {
-                            verts.extend(get_face(
-                                face,
-                                Atlas::StoneSlabTop,
-                                [x as f32, y as f32, z as f32],
-                            ));
-                            inds.extend(offset_indices(off));
-                            off += 4;
+                        let occluders_pos = get_occluders(neighbor_position, normal);
+                        let mut i = 0;
+                        for pos in occluders_pos {
+                            if pos.x > CHUNK_SIZE as f32 - 1.0
+                                || pos.x < 0.0
+                                || pos.y > CHUNK_SIZE as f32 - 1.0
+                                || pos.y < 0.0
+                                || pos.z > CHUNK_SIZE as f32 - 1.0
+                                || pos.z < 0.0
+                            {
+                                continue;
+                            };
+                            occluders[i] =
+                                (voxeldata[pos.x as usize][pos.y as usize][pos.z as usize].block_id
+                                    == 0) as u8 as f32
+                                    * 0.33;
+                            i += 1;
                         }
+                        verts.extend(get_face(
+                            face,
+                            normal,
+                            Atlas::GrassTop,
+                            [x as f32, y as f32, z as f32],
+                            occluders,
+                        ));
+                        inds.extend(offset_indices(off, face % 2 == 0));
+                        off += 4;
                     }
                 }
             }

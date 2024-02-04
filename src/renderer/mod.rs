@@ -1,5 +1,6 @@
 use wgpu::{util::DeviceExt, Surface};
 use winit::{
+    dpi::PhysicalPosition,
     dpi::PhysicalSize,
     event::*,
     event_loop::{EventLoop, EventLoopWindowTarget},
@@ -9,7 +10,6 @@ use winit::{
 
 use crate::{block, terrain};
 
-use self::mesher::Mesh;
 mod camera;
 mod mesher;
 mod texture;
@@ -30,10 +30,12 @@ struct State<'w> {
     diffuse_texture: texture::Texture,
     depth_texture: texture::Texture,
     camera: camera::Camera,
+    projection: camera::Projection,
     camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
+    mouse_pressed: bool,
     // Window last for safety
     window: Window,
 }
@@ -142,20 +144,14 @@ impl<'w> State<'w> {
             label: Some("diffuse_bind_group"),
         });
 
-        let camera = camera::Camera {
-            eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let projection =
+            camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
 
-        let camera_controller = camera::CameraController::new(0.2);
+        let camera_controller = camera::CameraController::new(8.0, 0.2);
 
         let mut camera_uniform = camera::CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        camera_uniform.update_view_proj(&camera, &projection);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -196,7 +192,7 @@ impl<'w> State<'w> {
                 push_constant_ranges: &[],
             });
 
-        let mesh = mesher::get_mesh(terrain::get_chunk(0, 0));
+        let mesh = mesher::get_mesh(terrain::get_chunk(0, 0, 0));
 
         //let vertices = mesher::Mesher::get_vertices();
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -279,10 +275,12 @@ impl<'w> State<'w> {
             diffuse_texture,
             depth_texture,
             camera,
+            projection,
             camera_controller,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
+            mouse_pressed: false,
         }
     }
 
@@ -298,16 +296,41 @@ impl<'w> State<'w> {
             self.surface.configure(&self.device, &self.config);
             self.depth_texture =
                 texture::Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            self.projection.resize(new_size.width, new_size.height);
         }
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_events(event)
+        match event {
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key),
+                        state,
+                        ..
+                    },
+                ..
+            } => self.camera_controller.process_keyboard(*key, *state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera_controller.process_scroll(delta);
+                true
+            }
+            WindowEvent::MouseInput {
+                button: MouseButton::Left,
+                state,
+                ..
+            } => {
+                self.mouse_pressed = *state == ElementState::Pressed;
+                true
+            }
+            _ => false,
+        }
     }
 
-    fn update(&mut self) {
-        self.camera_controller.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+    fn update(&mut self, dt: instant::Duration) {
+        self.camera_controller.update_camera(&mut self.camera, dt);
+        self.camera_uniform
+            .update_view_proj(&self.camera, &self.projection);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -380,8 +403,17 @@ pub async fn run() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
 
     let mut state = State::new(window).await;
+    let mut last_render_time = instant::Instant::now();
 
     let _ = event_loop.run(move |event, control_flow| match event {
+        Event::DeviceEvent {
+            event: DeviceEvent::MouseMotion { delta },
+            ..
+        } => {
+            if state.mouse_pressed {
+                state.camera_controller.process_mouse(delta.0, delta.1)
+            }
+        }
         Event::AboutToWait => {
             // RedrawRequested will only trigger once unless we manually
             // request it.
@@ -394,7 +426,10 @@ pub async fn run() {
             if !state.input(event) {
                 match event {
                     WindowEvent::RedrawRequested if window_id == state.window().id() => {
-                        state.update();
+                        let now = instant::Instant::now();
+                        let dt = now - last_render_time;
+                        last_render_time = now;
+                        state.update(dt);
                         match state.render() {
                             Ok(_) => {}
                             // Reconfigure the surface if lost
@@ -416,14 +451,10 @@ pub async fn run() {
                                 ..
                             },
                         ..
-                    } => EventLoopWindowTarget::exit(control_flow),
+                    } => control_flow.exit(),
                     WindowEvent::Resized(physical_size) => {
                         state.resize(*physical_size);
                     }
-                    /*WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                        // new_inner_size is &&mut so we have to dereference it twice
-                        state.resize(winit::dpi::to_logical(state.size, scale_factor));
-                    }*/
                     _ => {}
                 }
             }
