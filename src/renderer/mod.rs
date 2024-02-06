@@ -4,7 +4,7 @@ use winit::{
     event::*,
     event_loop::{EventLoop, EventLoopWindowTarget},
     keyboard::{KeyCode, PhysicalKey},
-    window::{CursorGrabMode, Window, WindowBuilder},
+    window::{self, CursorGrabMode, Window, WindowBuilder},
 };
 
 use crate::{block, terrain};
@@ -401,17 +401,18 @@ pub async fn run() {
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     let mut state = State::new(window).await;
+    state
+        .window
+        .set_cursor_grab(window::CursorGrabMode::Confined)
+        .unwrap();
+    state.window.set_cursor_visible(false);
     let mut last_render_time = instant::Instant::now();
 
     let _ = event_loop.run(move |event, control_flow| match event {
         Event::DeviceEvent {
             event: DeviceEvent::MouseMotion { delta },
             ..
-        } => {
-            if state.mouse_pressed {
-                state.camera_controller.process_mouse(delta.0, delta.1)
-            }
-        }
+        } => state.camera_controller.process_mouse(delta.0, delta.1),
         Event::AboutToWait => {
             // RedrawRequested will only trigger once unless we manually
             // request it.
