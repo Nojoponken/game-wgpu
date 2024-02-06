@@ -1,34 +1,28 @@
 pub enum Atlas {
+    Unknown,
     GrassTop,
-    Stone,
-    Dirt,
     GrassSide,
-    Plank,
-    StoneSlabSide,
-    StoneSlabTop,
-    Brick,
-    TntSide,
-    TntTop,
-    TntBottom,
-    Cobble,
-    Bedrock,
+    Dirt,
+    Stone,
     Sand,
-    MossyCobble,
+    StoneBrick,
+    MossyBrick,
+    Plank,
 }
 
-pub fn get_texture(origin: Atlas) -> [[f32; 2]; 4] {
+pub fn get_texture_coordinates(origin: Atlas, rotate: u8) -> [[f32; 2]; 4] {
     let [x, y] = match origin {
         Atlas::GrassTop => [0.0, 0.0],
-        Atlas::Stone => [0.0625, 0.0],
-        Atlas::Dirt => [0.125, 0.0],
-        Atlas::MossyCobble => [0.25, 0.125],
-        Atlas::StoneSlabTop => [0.375, 0.0],
-        _ => [0.875, 0.0625],
+        Atlas::GrassSide => [0.1, 0.0],
+        Atlas::Dirt => [0.2, 0.0],
+        Atlas::Stone => [0.3, 0.0],
+        Atlas::Sand => [0.4, 0.0],
+        Atlas::StoneBrick => [0.0, 0.1],
+        Atlas::MossyBrick => [0.1, 0.1],
+        Atlas::Plank => [0.3, 0.1],
+        _ => [0.9, 0.9],
     };
-    [
-        [x, y],
-        [x + 0.0625, y],
-        [x, y + 0.0625],
-        [x + 0.0625, y + 0.0625],
-    ]
+    let mut ret = [[x, y], [x + 0.1, y], [x + 0.1, y + 0.1], [x, y + 0.1]];
+    ret.rotate_right((rotate % 4) as usize);
+    [ret[0], ret[1], ret[3], ret[2]]
 }

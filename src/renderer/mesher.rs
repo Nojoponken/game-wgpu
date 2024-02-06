@@ -1,6 +1,8 @@
 use super::vertex::*;
 use crate::atlas::*;
+use crate::block;
 use crate::terrain::*;
+use cgmath::Array;
 use cgmath::Vector3;
 
 fn offset_indices(offset: u16, flip: bool) -> [u16; 6] {
@@ -47,14 +49,25 @@ fn get_corners(normal: Vector3<f32>, position: Vector3<f32>) -> [[f32; 3]; 4] {
 }
 
 fn get_face(
-    face: u8,
     normal: Vector3<f32>,
     texture: Atlas,
     coordinates: [f32; 3],
     occluders: [f32; 8],
 ) -> [Vertex; 4] {
-    let [tl, tr, bl, br] = get_texture(texture);
-    let [tlc, trc, blc, brc] = get_corners(
+    let mut rotation: u8 = 0;
+
+    if normal.x == -1.0 {
+        rotation = 2;
+    }
+    if normal.z == -1.0 {
+        rotation = 3;
+    }
+    if normal.z == 1.0 {
+        rotation = 3;
+    }
+
+    let textures = get_texture_coordinates(texture, rotation);
+    let corners = get_corners(
         normal,
         Vector3 {
             x: coordinates[0],
@@ -62,31 +75,32 @@ fn get_face(
             z: coordinates[2],
         },
     );
+    let flip = (normal.x + normal.y + normal.z < 0.0) as usize;
 
-    let normal_dir = [normal.x, normal.y, normal.z];
+    let normal_dir = normal.into();
 
     [
         Vertex {
-            position: tlc,
-            tex_coords: tl,
+            position: corners[0],
+            tex_coords: textures[0 + flip],
             normal: normal_dir,
             ao: occluders[0] + occluders[1] + occluders[2],
         },
         Vertex {
-            position: trc,
-            tex_coords: tr,
+            position: corners[1],
+            tex_coords: textures[1 - flip],
             normal: normal_dir,
             ao: occluders[2] + occluders[3] + occluders[4],
         },
         Vertex {
-            position: blc,
-            tex_coords: bl,
+            position: corners[2],
+            tex_coords: textures[2 + flip],
             normal: normal_dir,
             ao: occluders[6] + occluders[7] + occluders[0],
         },
         Vertex {
-            position: brc,
-            tex_coords: br,
+            position: corners[3],
+            tex_coords: textures[3 - flip],
             normal: normal_dir,
             ao: occluders[4] + occluders[5] + occluders[6],
         },
@@ -120,9 +134,9 @@ fn get_occluders(position: Vector3<f32>, normal: Vector3<f32>) -> [Vector3<f32>;
 
 fn get_normal(face: u8) -> Vector3<f32> {
     Vector3 {
-        x: (face == 1) as u8 as f32 - (face == 0) as u8 as f32,
-        y: (face == 3) as u8 as f32 - (face == 2) as u8 as f32,
-        z: (face == 5) as u8 as f32 - (face == 4) as u8 as f32,
+        x: (face == 0) as u8 as f32 - (face == 1) as u8 as f32,
+        y: (face == 2) as u8 as f32 - (face == 3) as u8 as f32,
+        z: (face == 4) as u8 as f32 - (face == 5) as u8 as f32,
     }
 }
 
@@ -143,9 +157,9 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
 
                         let mut occluders: [f32; 8] = [0.33; 8];
 
-                        let x_border = (x == 0 && face == 0) || (x == CHUNK_SIZE - 1 && face == 1);
-                        let y_border = (y == 0 && face == 2) || (y == CHUNK_SIZE - 1 && face == 3);
-                        let z_border = (z == 0 && face == 4) || (z == CHUNK_SIZE - 1 && face == 5);
+                        let x_border = 2 * x == (CHUNK_SIZE - 1) * (normal.x + 1.0) as usize;
+                        let y_border = 2 * y == (CHUNK_SIZE - 1) * (normal.y + 1.0) as usize;
+                        let z_border = 2 * z == (CHUNK_SIZE - 1) * (normal.z + 1.0) as usize;
 
                         if x_border || y_border || z_border {
                             continue;
@@ -165,6 +179,7 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
                         }
 
                         let occluders_pos = get_occluders(neighbor_position, normal);
+
                         let mut i = 0;
                         for pos in occluders_pos {
                             if pos.x > CHUNK_SIZE as f32 - 1.0
@@ -182,14 +197,17 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
                                     * 0.33;
                             i += 1;
                         }
+
+                        let flip = normal.sum() < 0.0;
+                        let texture =
+                            block::get_texture(voxeldata[x][y][z].block_id, normal.into());
                         verts.extend(get_face(
-                            face,
                             normal,
-                            Atlas::GrassTop,
+                            texture,
                             [x as f32, y as f32, z as f32],
                             occluders,
                         ));
-                        inds.extend(offset_indices(off, face % 2 == 0));
+                        inds.extend(offset_indices(off, flip));
                         off += 4;
                     }
                 }

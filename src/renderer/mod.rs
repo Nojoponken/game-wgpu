@@ -1,11 +1,10 @@
 use wgpu::{util::DeviceExt, Surface};
 use winit::{
-    dpi::PhysicalPosition,
-    dpi::PhysicalSize,
+    dpi::{PhysicalPosition, PhysicalSize},
     event::*,
     event_loop::{EventLoop, EventLoopWindowTarget},
     keyboard::{KeyCode, PhysicalKey},
-    window::{Window, WindowBuilder},
+    window::{CursorGrabMode, Window, WindowBuilder},
 };
 
 use crate::{block, terrain};
@@ -401,7 +400,6 @@ pub async fn run() {
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
-
     let mut state = State::new(window).await;
     let mut last_render_time = instant::Instant::now();
 
