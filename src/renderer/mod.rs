@@ -1,18 +1,18 @@
-use wgpu::{util::DeviceExt, Surface};
+use wgpu::{util::DeviceExt, Buffer, Surface};
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalSize,
     event::*,
     event_loop::{EventLoop, EventLoopWindowTarget},
     keyboard::{KeyCode, PhysicalKey},
-    window::{self, CursorGrabMode, Window, WindowBuilder},
+    window::{self, Window, WindowBuilder},
 };
 
-use crate::{block, terrain};
+use crate::terrain::{self, instance::InstanceRaw, vertex::Vertex};
 
 mod camera;
-mod mesher;
 mod texture;
-mod vertex;
+
+const WORLD_SIZE: isize = 2;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -21,20 +21,17 @@ struct State<'w> {
     config: wgpu::SurfaceConfiguration,
     size: PhysicalSize<u32>,
     render_pipeline: wgpu::RenderPipeline,
-    vertex_buffer: wgpu::Buffer,
-    //num_vertices: u32,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
     diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: texture::Texture,
+    //diffuse_texture: texture::Texture,
     depth_texture: texture::Texture,
     camera: camera::Camera,
     projection: camera::Projection,
     camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
-    camera_buffer: wgpu::Buffer,
+    camera_buffer: Buffer,
     camera_bind_group: wgpu::BindGroup,
     mouse_pressed: bool,
+    world: terrain::World,
     // Window last for safety
     window: Window,
 }
@@ -190,25 +187,6 @@ impl<'w> State<'w> {
                 bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
                 push_constant_ranges: &[],
             });
-
-        let mesh = mesher::get_mesh(terrain::get_chunk(0, 0, 0));
-
-        //let vertices = mesher::Mesher::get_vertices();
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(&mesh.vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        //let num_vertices = VERTICES.len() as u32;
-
-        //let indices = mesher::Mesher::get_indices();
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(&mesh.indices),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        let num_indices = mesh.indices.len() as u32;
-
         let depth_texture =
             texture::Texture::create_depth_texture(&device, &config, "depth_texture");
 
@@ -218,7 +196,7 @@ impl<'w> State<'w> {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: "vs_main",
-                buffers: &[vertex::Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 // 3.
@@ -258,6 +236,7 @@ impl<'w> State<'w> {
             multiview: None,
         });
 
+        let world = terrain::World::new(WORLD_SIZE, &device);
         Self {
             window,
             surface,
@@ -266,12 +245,8 @@ impl<'w> State<'w> {
             config,
             size,
             render_pipeline,
-            vertex_buffer,
-            //num_vertices,
-            index_buffer,
-            num_indices,
             diffuse_bind_group,
-            diffuse_texture,
+            //diffuse_texture,
             depth_texture,
             camera,
             projection,
@@ -280,6 +255,7 @@ impl<'w> State<'w> {
             camera_buffer,
             camera_bind_group,
             mouse_pressed: false,
+            world,
         }
     }
 
@@ -382,17 +358,21 @@ impl<'w> State<'w> {
             render_pass.set_pipeline(&self.render_pipeline);
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            for mesh in &self.world.meshes {
+                render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, mesh.instance_buffer.slice(..));
+                render_pass
+                    .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+
+                render_pass.draw_indexed(0..mesh.num_indices as u32, 0, 0..1);
+            }
         }
-
-        // submit will accept anything that implements IntoIter
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
-
         Ok(())
+
+        // submit will accept anything that implements IntoIter
     }
 }
 

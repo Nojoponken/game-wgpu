@@ -1,11 +1,17 @@
 use super::vertex::*;
+use super::*;
 use crate::atlas::*;
 use crate::block;
-use crate::terrain::*;
 use cgmath::Array;
+use cgmath::Deg;
+use cgmath::Quaternion;
+use cgmath::Rotation3;
 use cgmath::Vector3;
+use wgpu::util::DeviceExt;
+use wgpu::Buffer;
+use wgpu::Device;
 
-fn offset_indices(offset: u16, flip: bool) -> [u16; 6] {
+fn offset_indices(offset: u32, flip: bool) -> [u32; 6] {
     //let [a, b, c, d, e, f] = face;
     let mut ret = [
         0 + offset,
@@ -141,13 +147,17 @@ fn get_normal(face: u8) -> Vector3<f32> {
 }
 
 pub struct Mesh {
-    pub vertices: Vec<Vertex>,
-    pub indices: Vec<u16>,
+    //pub vertices: Vec<Vertex>,
+    //pub indices: Vec<u32>,
+    pub vertex_buffer: Buffer,
+    pub index_buffer: Buffer,
+    pub instance_buffer: Buffer,
+    pub num_indices: usize,
 }
-pub fn get_mesh(voxeldata: Chunk) -> Mesh {
-    let mut verts: Vec<Vertex> = Vec::new();
-    let mut inds: Vec<u16> = Vec::new();
-    let mut off: u16 = 0;
+pub fn get_mesh(voxeldata: &Chunk, chunk_pos: Vector3<isize>, device: &Device) -> Mesh {
+    let mut vertices: Vec<Vertex> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let mut off: u32 = 0;
     for x in 0..CHUNK_SIZE {
         for y in 0..CHUNK_SIZE {
             for z in 0..CHUNK_SIZE {
@@ -157,9 +167,9 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
 
                         let mut occluders: [f32; 8] = [0.33; 8];
 
-                        let x_border = 2 * x == (CHUNK_SIZE - 1) * (normal.x + 1.0) as usize;
-                        let y_border = 2 * y == (CHUNK_SIZE - 1) * (normal.y + 1.0) as usize;
-                        let z_border = 2 * z == (CHUNK_SIZE - 1) * (normal.z + 1.0) as usize;
+                        let x_border = x == (CHUNK_SIZE - 1) * ((normal.x + 1.0) / 2.0) as usize;
+                        let y_border = y == (CHUNK_SIZE - 1) * ((normal.y + 1.0) / 2.0) as usize;
+                        let z_border = z == (CHUNK_SIZE - 1) * ((normal.z + 1.0) / 2.0) as usize;
 
                         if x_border || y_border || z_border {
                             continue;
@@ -201,21 +211,52 @@ pub fn get_mesh(voxeldata: Chunk) -> Mesh {
                         let flip = normal.sum() < 0.0;
                         let texture =
                             block::get_texture(voxeldata[x][y][z].block_id, normal.into());
-                        verts.extend(get_face(
+                        vertices.extend(get_face(
                             normal,
                             texture,
                             [x as f32, y as f32, z as f32],
                             occluders,
                         ));
-                        inds.extend(offset_indices(off, flip));
+                        indices.extend(offset_indices(off, flip));
                         off += 4;
                     }
                 }
             }
         }
     }
+
+    let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Vertex Buffer"),
+        contents: bytemuck::cast_slice(&vertices),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
+
+    let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index Buffer"),
+        contents: bytemuck::cast_slice(&indices),
+        usage: wgpu::BufferUsages::INDEX,
+    });
+
+    let instance = instance::Instance {
+        position: Vector3 {
+            x: chunk_pos.x as f32 * CHUNK_SIZE as f32,
+            y: chunk_pos.y as f32 * CHUNK_SIZE as f32,
+            z: chunk_pos.z as f32 * CHUNK_SIZE as f32,
+        },
+        rotation: Quaternion::from_axis_angle(Vector3::unit_z(), Deg(0.0)),
+    };
+    let instance_data = vec![instance.to_raw()];
+    let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Instance Buffer"),
+        contents: bytemuck::cast_slice(&instance_data),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
     Mesh {
-        vertices: verts,
-        indices: inds,
+        // vertices,
+        //  indices,
+        vertex_buffer,
+        index_buffer,
+        instance_buffer,
+        num_indices: indices.len(),
     }
 }
