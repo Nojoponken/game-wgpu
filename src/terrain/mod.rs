@@ -18,22 +18,23 @@ pub type Chunk = HashMap<(u8, u8, u8), Block>; //[[[Block; CHUNK_SIZE]; CHUNK_SI
 fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: &Fbm<Perlin>) -> Chunk {
     let mut chunk: Chunk = HashMap::new();
 
-    let k = 0.25;
+    let k = 0.125;
+    let k2 = k * 2.0;
     let map = PlaneMapBuilder::<_, 2>::new(perlin)
         .set_size(CHUNK_SIZE, CHUNK_SIZE)
         .set_x_bounds(
-            -k * 2.0 + 1.0 * chunk_x as f64,
-            k * 2.0 + 1.0 * chunk_x as f64,
+            -k2 + 2.0 * k2 * chunk_x as f64,
+            k2 + 2.0 * k2 * chunk_x as f64,
         )
         .set_y_bounds(
-            -k * 2.0 + 1.0 * chunk_z as f64,
-            k * 2.0 + 1.0 * chunk_z as f64,
+            -k2 + 2.0 * k2 * chunk_z as f64,
+            k2 + 2.0 * k2 * chunk_z as f64,
         )
         .build();
     let big_map = PlaneMapBuilder::<_, 2>::new(perlin)
         .set_size(CHUNK_SIZE, CHUNK_SIZE)
-        .set_x_bounds(-k + chunk_x as f64 * 0.5, k + chunk_x as f64 * 0.5)
-        .set_y_bounds(-k + chunk_z as f64 * 0.5, k + chunk_z as f64 * 0.5)
+        .set_x_bounds(-k + 2.0 * k * chunk_x as f64, k + 2.0 * k * chunk_x as f64)
+        .set_y_bounds(-k + 2.0 * k * chunk_z as f64, k + 2.0 * k * chunk_z as f64)
         .build();
 
     for x in 0..CHUNK_SIZE {
