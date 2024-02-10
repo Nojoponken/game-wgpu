@@ -3,7 +3,7 @@ use noise::{
     core::perlin::{self, perlin_2d, perlin_3d, perlin_4d},
     permutationtable::PermutationTable,
     utils::*,
-    NoiseFn, Perlin,
+    Fbm, NoiseFn, Perlin,
 };
 use std::collections::HashMap;
 use wgpu::Device;
@@ -15,8 +15,26 @@ pub const CHUNK_SIZE: usize = 16;
 
 pub type Chunk = HashMap<(u8, u8, u8), Block>; //[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
 
-fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: Perlin) -> Chunk {
+fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: &Fbm<Perlin>) -> Chunk {
     let mut chunk: Chunk = HashMap::new();
+
+    let k = 0.25;
+    let map = PlaneMapBuilder::<_, 2>::new(perlin)
+        .set_size(CHUNK_SIZE, CHUNK_SIZE)
+        .set_x_bounds(
+            -k * 2.0 + 1.0 * chunk_x as f64,
+            k * 2.0 + 1.0 * chunk_x as f64,
+        )
+        .set_y_bounds(
+            -k * 2.0 + 1.0 * chunk_z as f64,
+            k * 2.0 + 1.0 * chunk_z as f64,
+        )
+        .build();
+    let big_map = PlaneMapBuilder::<_, 2>::new(perlin)
+        .set_size(CHUNK_SIZE, CHUNK_SIZE)
+        .set_x_bounds(-k + chunk_x as f64 * 0.5, k + chunk_x as f64 * 0.5)
+        .set_y_bounds(-k + chunk_z as f64 * 0.5, k + chunk_z as f64 * 0.5)
+        .build();
 
     for x in 0..CHUNK_SIZE {
         for y in 0..CHUNK_SIZE {
@@ -26,13 +44,16 @@ fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: Perlin) -> 
                 let sample_z = z as isize + chunk_z * CHUNK_SIZE as isize;
                 let generated_id;
 
-                let k = 5.0;
+                let val1 = map.get_value(x, z);
+                let val2 = big_map.get_value(x, z);
+                let depth = val1 * 4.0 + val2 * 8.0 - sample_y as f64;
 
-                let depth =
-                    perlin.get([sample_x as f64 * k, sample_z as f64 * k]) * 16.0 - sample_y as f64;
-
-                if depth < 0.0 {
+                if depth < 0.0 && sample_y < 0 {
+                    generated_id = 0;
+                } else if depth < 0.0 {
                     continue;
+                } else if depth < 1.0 && sample_y < 2 {
+                    generated_id = 4;
                 } else if depth < 1.0 {
                     generated_id = 1;
                 } else if depth < 2.0 {
@@ -61,14 +82,14 @@ pub struct World {
 
 impl World {
     pub fn new(world_size: isize, device: &Device) -> Self {
-        let perlin = Perlin::new(1291738);
+        let perlin = Fbm::<Perlin>::new(1);
 
         let mut chunks = HashMap::new();
         let todo = world_size * world_size * 3;
         for x in 0..world_size {
             for y in -1..=1 {
                 for z in 0..world_size {
-                    chunks.insert([x, y, z], gen_chunk(x, y, z, perlin));
+                    chunks.insert([x, y, z], gen_chunk(x, y, z, &perlin));
                     let progress = z + (y + 1) * world_size + x * world_size * 3 + 1;
                     println!("Generating terrain: {progress}/{todo}")
                 }

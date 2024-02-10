@@ -31,6 +31,8 @@ pub fn get_texture(block_id: u8, normal: [f32; 3]) -> Atlas {
         },
         2 => Atlas::Dirt,
         3 => Atlas::Stone,
+        4 => Atlas::Sand,
+        0 => Atlas::Water,
         _ => Atlas::Unknown,
     }
 }

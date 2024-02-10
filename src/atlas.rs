@@ -8,6 +8,7 @@ pub enum Atlas {
     StoneBrick,
     MossyBrick,
     Plank,
+    Water,
 }
 
 pub fn get_texture_coordinates(origin: Atlas, rotate: u8) -> [[f32; 2]; 4] {
@@ -20,6 +21,7 @@ pub fn get_texture_coordinates(origin: Atlas, rotate: u8) -> [[f32; 2]; 4] {
         Atlas::StoneBrick => [0.0, 0.1],
         Atlas::MossyBrick => [0.1, 0.1],
         Atlas::Plank => [0.3, 0.1],
+        Atlas::Water => [0.7, 0.0],
         _ => [0.9, 0.9],
     };
     let mut ret = [[x, y], [x + 0.1, y], [x + 0.1, y + 0.1], [x, y + 0.1]];
