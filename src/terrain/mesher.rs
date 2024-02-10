@@ -147,6 +147,54 @@ fn get_normal(face: u8) -> Vector3<f32> {
     }
 }
 
+fn outside_chunk(position: &Vector3<f32>) -> bool {
+    position.x.is_negative()
+        || position.x >= CHUNK_SIZE as f32
+        || position.y.is_negative()
+        || position.y >= CHUNK_SIZE as f32
+        || position.z.is_negative()
+        || position.z >= CHUNK_SIZE as f32
+}
+
+fn check_neighbor_at_edge_of_chunk(
+    chunks: &HashMap<[isize; 3], Chunk>,
+    chunk_pos: &[isize; 3],
+    normal: &Vector3<f32>,
+    neighbor: &Vector3<f32>,
+) -> bool {
+    let neighbor_chunk = chunks.get(&[
+        chunk_pos[0] + normal.x as isize,
+        chunk_pos[1] + normal.y as isize,
+        chunk_pos[2] + normal.z as isize,
+    ]);
+    let relative_pos = (
+        (neighbor.x + CHUNK_SIZE as f32 * -normal.x) as u8,
+        (neighbor.y + CHUNK_SIZE as f32 * -normal.y) as u8,
+        (neighbor.z + CHUNK_SIZE as f32 * -normal.z) as u8,
+    );
+    let block_exists;
+    if neighbor_chunk.is_some() {
+        block_exists = neighbor_chunk.unwrap().contains_key(&relative_pos)
+    } else {
+        block_exists = false;
+    }
+    block_exists
+}
+
+fn get_relative_chunk(position: &Vector3<f32>) -> Vector3<f32> {
+    let less_than_zero_x = (position.x < 0.0) as u8 as f32;
+    let larger_than_chunk_x = (position.x >= CHUNK_SIZE as f32) as u8 as f32;
+    let less_than_zero_y = (position.y < 0.0) as u8 as f32;
+    let larger_than_chunk_y = (position.y >= CHUNK_SIZE as f32) as u8 as f32;
+    let less_than_zero_z = (position.z < 0.0) as u8 as f32;
+    let larger_than_chunk_z = (position.z >= CHUNK_SIZE as f32) as u8 as f32;
+
+    Vector3 {
+        x: less_than_zero_x * -1.0 + larger_than_chunk_x,
+        y: less_than_zero_y * -1.0 + larger_than_chunk_y,
+        z: less_than_zero_z * -1.0 + larger_than_chunk_z,
+    }
+}
 pub struct Mesh {
     //pub vertices: Vec<Vertex>,
     //pub indices: Vec<u32>,
@@ -155,7 +203,7 @@ pub struct Mesh {
     pub instance_buffer: Buffer,
     pub num_indices: usize,
 }
-//pub fn get_mesh(voxeldata: &Chunk, chunk_pos: Vector3<isize>, device: &Device) -> Mesh {
+
 pub fn get_mesh(
     chunks: &HashMap<[isize; 3], Chunk>,
     chunk_pos: [isize; 3],
@@ -179,31 +227,9 @@ pub fn get_mesh(
                 z: block.0 .2 as f32,
             } + normal;
 
-            if neighbor_position.x.is_negative()
-                || neighbor_position.x >= CHUNK_SIZE as f32
-                || neighbor_position.y.is_negative()
-                || neighbor_position.y >= CHUNK_SIZE as f32
-                || neighbor_position.z.is_negative()
-                || neighbor_position.z >= CHUNK_SIZE as f32
-            {
-                let neighbor_chunk = chunks.get(&[
-                    chunk_pos[0] + normal.x as isize,
-                    chunk_pos[1] + normal.y as isize,
-                    chunk_pos[2] + normal.z as isize,
-                ]);
-                let relative_pos = (
-                    (neighbor_position.x + CHUNK_SIZE as f32 * -normal.x) as u8,
-                    (neighbor_position.y + CHUNK_SIZE as f32 * -normal.y) as u8,
-                    (neighbor_position.z + CHUNK_SIZE as f32 * -normal.z) as u8,
-                );
-                let visible;
-                if neighbor_chunk.is_some() {
-                    visible = !neighbor_chunk.unwrap().contains_key(&relative_pos)
-                } else {
-                    visible = true;
-                }
-
-                if !visible {
+            if outside_chunk(&neighbor_position) {
+                if check_neighbor_at_edge_of_chunk(chunks, &chunk_pos, &normal, &neighbor_position)
+                {
                     continue;
                 }
             } else if voxeldata.contains_key(&(
@@ -218,17 +244,19 @@ pub fn get_mesh(
 
             let mut i = 0;
             for pos in occluders_pos {
-                if pos.x > CHUNK_SIZE as f32 - 1.0
-                    || pos.x < 0.0
-                    || pos.y > CHUNK_SIZE as f32 - 1.0
-                    || pos.y < 0.0
-                    || pos.z > CHUNK_SIZE as f32 - 1.0
-                    || pos.z < 0.0
-                {
-                    continue;
+                if outside_chunk(&pos) {
+                    occluders[i] = !check_neighbor_at_edge_of_chunk(
+                        chunks,
+                        &chunk_pos,
+                        &get_relative_chunk(&pos),
+                        &pos,
+                    ) as u8 as f32
+                        * 0.33;
+                } else {
+                    occluders[i] = !voxeldata.contains_key(&(pos.x as u8, pos.y as u8, pos.z as u8))
+                        as u8 as f32
+                        * 0.33;
                 }
-                let option = voxeldata.get(&(pos.x as u8, pos.y as u8, pos.z as u8));
-                occluders[i] = option.is_none() as u8 as f32 * 0.33;
                 i += 1;
             }
 

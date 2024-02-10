@@ -7,12 +7,15 @@ use winit::{
     window::{self, Window, WindowBuilder},
 };
 
-use crate::terrain::{self, instance::InstanceRaw, vertex::Vertex};
+use crate::{
+    player::*,
+    terrain::{self, instance::InstanceRaw, vertex::Vertex},
+};
 
 mod camera;
 mod texture;
 
-const WORLD_SIZE: isize = 8;
+const WORLD_SIZE: isize = 4;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -24,9 +27,10 @@ struct State<'w> {
     diffuse_bind_group: wgpu::BindGroup,
     //diffuse_texture: texture::Texture,
     depth_texture: texture::Texture,
-    camera: camera::Camera,
+    //camera: Camera,
+    player: Player,
+    player_controller: controller::PlayerController,
     projection: camera::Projection,
-    camera_controller: camera::CameraController,
     camera_uniform: camera::CameraUniform,
     camera_buffer: Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -140,11 +144,9 @@ impl<'w> State<'w> {
             label: Some("diffuse_bind_group"),
         });
 
-        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let camera = Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
         let projection =
             camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
-
-        let camera_controller = camera::CameraController::new(8.0, 0.2);
 
         let mut camera_uniform = camera::CameraUniform::new();
         camera_uniform.update_view_proj(&camera, &projection);
@@ -237,6 +239,8 @@ impl<'w> State<'w> {
         });
 
         let world = terrain::World::new(WORLD_SIZE, &device);
+        let player = Player::new([0.0, 0.0, 0.0].into());
+        let player_controller = controller::PlayerController::new(8.0, 0.2);
         Self {
             window,
             surface,
@@ -248,9 +252,10 @@ impl<'w> State<'w> {
             diffuse_bind_group,
             //diffuse_texture,
             depth_texture,
-            camera,
+            // camera,
             projection,
-            camera_controller,
+            player,
+            player_controller,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
@@ -285,9 +290,9 @@ impl<'w> State<'w> {
                         ..
                     },
                 ..
-            } => self.camera_controller.process_keyboard(*key, *state),
+            } => self.player_controller.process_keyboard(*key, *state),
             WindowEvent::MouseWheel { delta, .. } => {
-                self.camera_controller.process_scroll(delta);
+                self.player_controller.process_scroll(delta);
                 true
             }
             WindowEvent::MouseInput {
@@ -303,9 +308,9 @@ impl<'w> State<'w> {
     }
 
     fn update(&mut self, dt: instant::Duration) {
-        self.camera_controller.update_camera(&mut self.camera, dt);
+        self.player.update(&mut self.player_controller, dt);
         self.camera_uniform
-            .update_view_proj(&self.camera, &self.projection);
+            .update_view_proj(&self.player.camera, &self.projection);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -392,7 +397,7 @@ pub async fn run() {
         Event::DeviceEvent {
             event: DeviceEvent::MouseMotion { delta },
             ..
-        } => state.camera_controller.process_mouse(delta.0, delta.1),
+        } => state.player_controller.process_mouse(delta.0, delta.1),
         Event::AboutToWait => {
             // RedrawRequested will only trigger once unless we manually
             // request it.
