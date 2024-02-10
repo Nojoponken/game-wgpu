@@ -12,7 +12,7 @@ use crate::terrain::{self, instance::InstanceRaw, vertex::Vertex};
 mod camera;
 mod texture;
 
-const WORLD_SIZE: isize = 2;
+const WORLD_SIZE: isize = 8;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -63,7 +63,7 @@ impl<'w> State<'w> {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::empty(),
+                    required_features: wgpu::Features::POLYGON_MODE_LINE,
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
@@ -215,7 +215,7 @@ impl<'w> State<'w> {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: Some(wgpu::Face::Back),
                 // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
-                polygon_mode: wgpu::PolygonMode::Fill,
+                polygon_mode: wgpu::PolygonMode::Fill, //wgpu::PolygonMode::Line,
                 // Requires Features::DEPTH_CLIP_CONTROL
                 unclipped_depth: false,
                 // Requires Features::CONSERVATIVE_RASTERIZATION

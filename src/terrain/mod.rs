@@ -1,31 +1,22 @@
 use super::block::Block;
-use cgmath::Vector3;
 use noise::{
-    core::perlin::{perlin_2d, perlin_3d, perlin_4d},
+    core::perlin::{self, perlin_2d, perlin_3d, perlin_4d},
     permutationtable::PermutationTable,
     utils::*,
+    NoiseFn, Perlin,
 };
 use std::collections::HashMap;
-use wgpu::{core::device, Device};
+use wgpu::Device;
 pub mod instance;
 mod mesher;
 pub mod vertex;
 
-pub const CHUNK_SIZE: usize = 32;
+pub const CHUNK_SIZE: usize = 16;
 
-pub type Chunk = [[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+pub type Chunk = HashMap<(u8, u8, u8), Block>; //[[[Block; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
 
-fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize) -> Chunk {
-    let hasher = PermutationTable::new(1);
-    let map = PlaneMapBuilder::new_fn(|point, hasher| perlin_3d(point.into(), hasher), &hasher)
-        .set_size(1024, 1024)
-        .set_x_bounds(-5.0, 5.0)
-        .set_y_bounds(-5.0, 5.0)
-        .build();
-    let mut chunk: Chunk = [[[Block {
-        block_id: 0,
-        block_state: 0,
-    }; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: Perlin) -> Chunk {
+    let mut chunk: Chunk = HashMap::new();
 
     for x in 0..CHUNK_SIZE {
         for y in 0..CHUNK_SIZE {
@@ -33,15 +24,15 @@ fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize) -> Chunk {
                 let sample_x = x as isize + chunk_x * CHUNK_SIZE as isize;
                 let sample_y = y as isize + chunk_y * CHUNK_SIZE as isize;
                 let sample_z = z as isize + chunk_z * CHUNK_SIZE as isize;
-                let k = 10;
                 let generated_id;
-                let depth = 16.0 * map.get_value(sample_x as usize * k, sample_z as usize * k)
-                    + 16.0
-                    - (y as isize + chunk_y * CHUNK_SIZE as isize) as f64;
-                //let depth =
-                //   perlin_3d([sample_x as f64, 0.0, sample_z as f64], &hasher) * 16.0 - y as f64;
+
+                let k = 5.0;
+
+                let depth =
+                    perlin.get([sample_x as f64 * k, sample_z as f64 * k]) * 16.0 - sample_y as f64;
+
                 if depth < 0.0 {
-                    generated_id = 0;
+                    continue;
                 } else if depth < 1.0 {
                     generated_id = 1;
                 } else if depth < 2.0 {
@@ -50,10 +41,13 @@ fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize) -> Chunk {
                     generated_id = 3;
                 }
 
-                chunk[x][y][z] = Block {
-                    block_id: generated_id as u8,
-                    block_state: 0,
-                };
+                chunk.insert(
+                    (x as u8, y as u8, z as u8),
+                    Block {
+                        block_id: generated_id as u8,
+                        block_state: 0,
+                    },
+                );
             }
         }
     }
@@ -67,12 +61,16 @@ pub struct World {
 
 impl World {
     pub fn new(world_size: isize, device: &Device) -> Self {
-        let mut chunks = HashMap::new();
+        let perlin = Perlin::new(1291738);
 
+        let mut chunks = HashMap::new();
+        let todo = world_size * world_size * 3;
         for x in 0..world_size {
-            for y in 0..world_size {
+            for y in -1..=1 {
                 for z in 0..world_size {
-                    chunks.insert([x, y, z], gen_chunk(x, y, z));
+                    chunks.insert([x, y, z], gen_chunk(x, y, z, perlin));
+                    let progress = z + (y + 1) * world_size + x * world_size * 3 + 1;
+                    println!("Generating terrain: {progress}/{todo}")
                 }
             }
         }
@@ -80,13 +78,11 @@ impl World {
         let mut meshes = Vec::new();
 
         for x in 0..world_size {
-            for y in 0..world_size {
+            for y in -1..=1 {
                 for z in 0..world_size {
-                    meshes.push(mesher::get_mesh(
-                        chunks.get(&[x, y, z]).unwrap(),
-                        Vector3{x:x, y:y, z:z},
-                        device,
-                    ));
+                    meshes.push(mesher::get_mesh(&chunks, [x, y, z], device));
+                    let progress = z + (y + 1) * world_size + x * world_size * 3 + 1;
+                    println!("Generating mesh: {progress}/{todo}")
                 }
             }
         }

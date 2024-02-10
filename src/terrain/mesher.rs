@@ -2,6 +2,7 @@ use super::vertex::*;
 use super::*;
 use crate::atlas::*;
 use crate::block;
+use cgmath::num_traits::Signed;
 use cgmath::Array;
 use cgmath::Deg;
 use cgmath::Quaternion;
@@ -154,74 +155,93 @@ pub struct Mesh {
     pub instance_buffer: Buffer,
     pub num_indices: usize,
 }
-pub fn get_mesh(voxeldata: &Chunk, chunk_pos: Vector3<isize>, device: &Device) -> Mesh {
+//pub fn get_mesh(voxeldata: &Chunk, chunk_pos: Vector3<isize>, device: &Device) -> Mesh {
+pub fn get_mesh(
+    chunks: &HashMap<[isize; 3], Chunk>,
+    chunk_pos: [isize; 3],
+    device: &Device,
+) -> Mesh {
     let mut vertices: Vec<Vertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let mut off: u32 = 0;
-    for x in 0..CHUNK_SIZE {
-        for y in 0..CHUNK_SIZE {
-            for z in 0..CHUNK_SIZE {
-                if voxeldata[x][y][z].block_id != 0 {
-                    for face in 0..6 {
-                        let normal = get_normal(face);
 
-                        let mut occluders: [f32; 8] = [0.33; 8];
+    let voxeldata = chunks.get(&chunk_pos).unwrap();
+    for block in voxeldata {
+        for face in 0..6 {
+            let normal = get_normal(face);
 
-                        let x_border = x == (CHUNK_SIZE - 1) * ((normal.x + 1.0) / 2.0) as usize;
-                        let y_border = y == (CHUNK_SIZE - 1) * ((normal.y + 1.0) / 2.0) as usize;
-                        let z_border = z == (CHUNK_SIZE - 1) * ((normal.z + 1.0) / 2.0) as usize;
+            let mut occluders: [f32; 8] = [0.33; 8];
+            let neighbor_position;
 
-                        if x_border || y_border || z_border {
-                            continue;
-                        }
-                        let neighbor_position = Vector3 {
-                            x: x as f32,
-                            y: y as f32,
-                            z: z as f32,
-                        } + normal; //hhget_neighbor([x, y, z], face);
+            neighbor_position = Vector3 {
+                x: block.0 .0 as f32,
+                y: block.0 .1 as f32,
+                z: block.0 .2 as f32,
+            } + normal;
 
-                        if voxeldata[neighbor_position.x as usize][neighbor_position.y as usize]
-                            [neighbor_position.z as usize]
-                            .block_id
-                            != 0
-                        {
-                            continue;
-                        }
-
-                        let occluders_pos = get_occluders(neighbor_position, normal);
-
-                        let mut i = 0;
-                        for pos in occluders_pos {
-                            if pos.x > CHUNK_SIZE as f32 - 1.0
-                                || pos.x < 0.0
-                                || pos.y > CHUNK_SIZE as f32 - 1.0
-                                || pos.y < 0.0
-                                || pos.z > CHUNK_SIZE as f32 - 1.0
-                                || pos.z < 0.0
-                            {
-                                continue;
-                            };
-                            occluders[i] =
-                                (voxeldata[pos.x as usize][pos.y as usize][pos.z as usize].block_id
-                                    == 0) as u8 as f32
-                                    * 0.33;
-                            i += 1;
-                        }
-
-                        let flip = normal.sum() < 0.0;
-                        let texture =
-                            block::get_texture(voxeldata[x][y][z].block_id, normal.into());
-                        vertices.extend(get_face(
-                            normal,
-                            texture,
-                            [x as f32, y as f32, z as f32],
-                            occluders,
-                        ));
-                        indices.extend(offset_indices(off, flip));
-                        off += 4;
-                    }
+            if neighbor_position.x.is_negative()
+                || neighbor_position.x >= CHUNK_SIZE as f32
+                || neighbor_position.y.is_negative()
+                || neighbor_position.y >= CHUNK_SIZE as f32
+                || neighbor_position.z.is_negative()
+                || neighbor_position.z >= CHUNK_SIZE as f32
+            {
+                let neighbor_chunk = chunks.get(&[
+                    chunk_pos[0] + normal.x as isize,
+                    chunk_pos[1] + normal.y as isize,
+                    chunk_pos[2] + normal.z as isize,
+                ]);
+                let relative_pos = (
+                    (neighbor_position.x + CHUNK_SIZE as f32 * -normal.x) as u8,
+                    (neighbor_position.y + CHUNK_SIZE as f32 * -normal.y) as u8,
+                    (neighbor_position.z + CHUNK_SIZE as f32 * -normal.z) as u8,
+                );
+                let visible;
+                if neighbor_chunk.is_some() {
+                    visible = !neighbor_chunk.unwrap().contains_key(&relative_pos)
+                } else {
+                    visible = true;
                 }
+
+                if !visible {
+                    continue;
+                }
+            } else if voxeldata.contains_key(&(
+                neighbor_position.x as u8,
+                neighbor_position.y as u8,
+                neighbor_position.z as u8,
+            )) {
+                continue;
             }
+
+            let occluders_pos = get_occluders(neighbor_position, normal);
+
+            let mut i = 0;
+            for pos in occluders_pos {
+                if pos.x > CHUNK_SIZE as f32 - 1.0
+                    || pos.x < 0.0
+                    || pos.y > CHUNK_SIZE as f32 - 1.0
+                    || pos.y < 0.0
+                    || pos.z > CHUNK_SIZE as f32 - 1.0
+                    || pos.z < 0.0
+                {
+                    continue;
+                }
+                let option = voxeldata.get(&(pos.x as u8, pos.y as u8, pos.z as u8));
+                occluders[i] = option.is_none() as u8 as f32 * 0.33;
+                i += 1;
+            }
+
+            let flip = normal.sum() < 0.0;
+            let texture = block::get_texture(block.1.block_id, normal.into());
+            vertices.extend(get_face(
+                normal,
+                texture,
+                [block.0 .0 as f32, block.0 .1 as f32, block.0 .2 as f32],
+                occluders,
+            ));
+            indices.extend(offset_indices(off, flip));
+            off += 4;
         }
     }
 
@@ -239,9 +259,9 @@ pub fn get_mesh(voxeldata: &Chunk, chunk_pos: Vector3<isize>, device: &Device) -
 
     let instance = instance::Instance {
         position: Vector3 {
-            x: chunk_pos.x as f32 * CHUNK_SIZE as f32,
-            y: chunk_pos.y as f32 * CHUNK_SIZE as f32,
-            z: chunk_pos.z as f32 * CHUNK_SIZE as f32,
+            x: chunk_pos[0] as f32 * CHUNK_SIZE as f32,
+            y: chunk_pos[1] as f32 * CHUNK_SIZE as f32,
+            z: chunk_pos[2] as f32 * CHUNK_SIZE as f32,
         },
         rotation: Quaternion::from_axis_angle(Vector3::unit_z(), Deg(0.0)),
     };
