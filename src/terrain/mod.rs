@@ -1,4 +1,5 @@
 use super::block::Block;
+use cgmath::{num_traits::abs, Point3};
 use noise::{utils::*, Fbm, Perlin};
 use std::collections::HashMap;
 use wgpu::Device;
@@ -42,7 +43,7 @@ fn gen_chunk(chunk_x: isize, chunk_y: isize, chunk_z: isize, perlin: &Fbm<Perlin
 
                 let val1 = map.get_value(x, z);
                 let val2 = big_map.get_value(x, z);
-                let depth = val1 * 4.0 + val2 * 8.0 - global_y as f64;
+                let depth = val1 * 4.0 + val2 * 8.0 - global_y as f64 + 0.0;
 
                 if depth < 0.0 && global_y < 0 {
                     generated_id = 0;
@@ -115,19 +116,19 @@ impl World {
             self.chunks.get(&[0, 0, 0]).unwrap()
         }
     }
-    pub fn block_exists(&self, position: &(f64, f64, f64)) -> bool {
+    pub fn block_exists(&self, position: Point3<f32>) -> bool {
         let chunk_pos = [
-            (position.0 / CHUNK_SIZE as f64) as isize,
-            (position.1 / CHUNK_SIZE as f64) as isize,
-            (position.2 / CHUNK_SIZE as f64) as isize,
+            (position.x / CHUNK_SIZE as f32).floor() as isize,
+            (position.y / CHUNK_SIZE as f32).floor() as isize,
+            (position.z / CHUNK_SIZE as f32).floor() as isize,
         ];
         if !self.chunks.contains_key(&chunk_pos) {
             return false;
         }
         let relative_pos = (
-            (position.0 - chunk_pos[0] as f64) as u8,
-            (position.1 - chunk_pos[1] as f64) as u8,
-            (position.2 - chunk_pos[2] as f64) as u8,
+            (((position.x % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
+            (((position.y % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
+            (((position.z % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
         );
         if self
             .chunks

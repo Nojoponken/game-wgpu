@@ -1,5 +1,4 @@
 use cgmath::{InnerSpace, Rad, Vector3};
-use instant::Duration;
 use std::f32::consts::FRAC_PI_2;
 use winit::{
     dpi::PhysicalPosition,
@@ -130,16 +129,11 @@ impl PlayerController {
 
         // Move up/down. Since we don't use roll, we can just
         // modify the y coordinate directly.
-        player.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
+        //player.position.y += (self.amount_up - self.amount_down) * self.speed * dt;
+        if player.velocity.y == 0.0 && self.amount_up != 0.0 {
+            player.velocity.y = 0.2;
+        }
 
         // Physics
-
-        player.camera.position = player.position
-            + Vector3 {
-                x: 0.0,
-                y: player.height,
-                z: 0.0,
-            };
-        self.update_camera(&mut player.camera, dt)
     }
 }

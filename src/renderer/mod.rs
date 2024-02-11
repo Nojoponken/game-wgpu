@@ -239,7 +239,7 @@ impl<'w> State<'w> {
         });
 
         let world = terrain::World::new(WORLD_SIZE, &device);
-        let player = Player::new([0.0, 0.0, 0.0].into());
+        let player = Player::new([5.0, 16.0, 5.0].into());
         let player_controller = controller::PlayerController::new(8.0, 0.2);
         Self {
             window,
@@ -308,7 +308,8 @@ impl<'w> State<'w> {
     }
 
     fn update(&mut self, dt: instant::Duration) {
-        self.player.update(&mut self.player_controller, dt);
+        self.player
+            .update(&mut self.player_controller, dt, &self.world);
         self.camera_uniform
             .update_view_proj(&self.player.camera, &self.projection);
         self.queue.write_buffer(

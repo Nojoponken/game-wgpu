@@ -1,8 +1,12 @@
+mod collision;
 pub mod controller;
 
 use cgmath::Point3;
 use cgmath::Rad;
+use cgmath::Vector3;
 use instant::Duration;
+
+use crate::terrain::World;
 
 use self::controller::PlayerController;
 
@@ -27,7 +31,7 @@ impl Camera {
 
 pub struct Player {
     pub position: Point3<f32>,
-    velocity: Point3<f32>,
+    velocity: Vector3<f32>,
     pub camera: Camera,
     pub height: f32,
     pub width: f32,
@@ -37,7 +41,7 @@ impl Player {
     pub fn new(position: Point3<f32>) -> Self {
         Self {
             position,
-            velocity: Point3 {
+            velocity: Vector3 {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
@@ -47,8 +51,21 @@ impl Player {
             width: 2.0,
         }
     }
-    pub fn update(&mut self, controller: &mut PlayerController, dt: Duration) {
+    pub fn update(&mut self, controller: &mut PlayerController, dt: Duration, world: &World) {
         let dt = dt.as_secs_f32();
-        controller.update_player(self, dt)
+        controller.update_player(self, dt);
+
+        self.velocity.y -= 0.5 * dt;
+        self.position += self.velocity;
+
+        collision::handle_collision(self, dt, world);
+        self.camera.position += ((self.position
+            + Vector3 {
+                x: 0.0,
+                y: self.height,
+                z: 0.0,
+            })
+            - self.camera.position);
+        controller.update_camera(&mut self.camera, dt);
     }
 }

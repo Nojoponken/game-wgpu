@@ -30,7 +30,13 @@ fn offset_indices(offset: u32, flip: bool) -> [u32; 6] {
 
 fn get_corners(normal: Vector3<f32>, position: Vector3<f32>) -> [[f32; 3]; 4] {
     let half = normal * 0.5;
-    let middle = position + half;
+    let middle = position
+        + Vector3 {
+            x: 0.5,
+            y: 0.5,
+            z: 0.5,
+        }
+        + half;
     [
         [
             middle.x + half.y + half.z,
