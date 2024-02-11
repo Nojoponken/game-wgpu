@@ -15,7 +15,7 @@ use crate::{
 mod camera;
 mod texture;
 
-const WORLD_SIZE: isize = 4;
+const WORLD_SIZE: isize = 8;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
@@ -240,7 +240,7 @@ impl<'w> State<'w> {
 
         let world = terrain::World::new(WORLD_SIZE, &device);
         let player = Player::new([5.0, 16.0, 5.0].into());
-        let player_controller = controller::PlayerController::new(8.0, 0.2);
+        let player_controller = controller::PlayerController::new(1.5, 0.2);
         Self {
             window,
             surface,

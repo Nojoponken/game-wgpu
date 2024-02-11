@@ -114,8 +114,8 @@ impl PlayerController {
         let (yaw_sin, yaw_cos) = player.camera.yaw.0.sin_cos();
         let forward = Vector3::new(yaw_cos, 0.0, yaw_sin).normalize();
         let right = Vector3::new(-yaw_sin, 0.0, yaw_cos).normalize();
-        player.position += forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
-        player.position += right * (self.amount_right - self.amount_left) * self.speed * dt;
+        player.velocity += forward * (self.amount_forward - self.amount_backward) * self.speed * dt;
+        player.velocity += right * (self.amount_right - self.amount_left) * self.speed * dt;
 
         // Move in/out (aka. "zoom")
         // Note: this isn't an actual zoom. The camera's position

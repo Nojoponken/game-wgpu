@@ -47,8 +47,8 @@ impl Player {
                 z: 0.0,
             },
             camera: Camera::new(position, Rad(0.0), Rad(0.0)),
-            height: 3.0,
-            width: 2.0,
+            height: 2.8,
+            width: 1.8,
         }
     }
     pub fn update(&mut self, controller: &mut PlayerController, dt: Duration, world: &World) {
@@ -56,13 +56,15 @@ impl Player {
         controller.update_player(self, dt);
 
         self.velocity.y -= 0.5 * dt;
+        self.velocity.x *= 0.9;
+        self.velocity.z *= 0.9;
         self.position += self.velocity;
 
-        collision::handle_collision(self, dt, world);
+        collision::handle_collision(self, world);
         self.camera.position += ((self.position
             + Vector3 {
                 x: 0.0,
-                y: self.height,
+                y: self.height - 0.3,
                 z: 0.0,
             })
             - self.camera.position);
