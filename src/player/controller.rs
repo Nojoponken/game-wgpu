@@ -112,9 +112,19 @@ impl PlayerController {
 
         let direction = Vector3 { x, y, z };
         println!("{}", direction.magnitude());
+        let xn = direction.x.is_negative() as u8 as f32;
+        let yn = direction.y.is_negative() as u8 as f32;
+        let zn = direction.z.is_negative() as u8 as f32;
 
-        for i in 0..30 {
-            current += direction * 0.5;
+        for i in 0..60 {
+            let step_size_x = abs((current.x + (xn - current.x.floor())) / direction.x);
+            println!("{step_size_x}");
+            let step_size_y = abs((current.y + (yn - current.y.floor())) / direction.y);
+            println!("{step_size_y}");
+            let step_size_z = abs((current.z + (zn - current.z.floor())) / direction.z);
+            println!("{step_size_z}");
+            let step_size = step_size_x.min(step_size_y).min(step_size_z);
+            current += direction * step_size;
             if world.block_exists(current) {
                 world.remove_block(current);
                 break;
