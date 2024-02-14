@@ -1,8 +1,10 @@
+use std::vec;
+
 use wgpu::{util::DeviceExt, Buffer, Surface};
 use winit::{
     dpi::PhysicalSize,
     event::*,
-    event_loop::{EventLoop, EventLoopWindowTarget},
+    event_loop::{DeviceEvents, EventLoop, EventLoopWindowTarget},
     keyboard::{KeyCode, PhysicalKey},
     window::{self, Window, WindowBuilder},
 };
@@ -67,7 +69,10 @@ impl<'w> State<'w> {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::POLYGON_MODE_LINE,
+                    required_features: wgpu::Features::union(
+                        wgpu::Features::POLYGON_MODE_LINE,
+                        wgpu::Features::DEPTH_CLIP_CONTROL,
+                    ),
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
@@ -341,9 +346,9 @@ impl<'w> State<'w> {
                         resolve_target: None,
                         ops: wgpu::Operations {
                             load: wgpu::LoadOp::Clear(wgpu::Color {
-                                r: 0.1,
-                                g: 0.2,
-                                b: 0.3,
+                                r: 0.8,
+                                g: 0.8,
+                                b: 0.8,
                                 a: 1.0,
                             }),
                             store: wgpu::StoreOp::Store,
@@ -366,12 +371,12 @@ impl<'w> State<'w> {
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
 
             for mesh in &self.world.meshes {
-                render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-                render_pass.set_vertex_buffer(1, mesh.instance_buffer.slice(..));
+                render_pass.set_vertex_buffer(0, mesh.1.vertex_buffer.slice(..));
+                render_pass.set_vertex_buffer(1, mesh.1.instance_buffer.slice(..));
                 render_pass
-                    .set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+                    .set_index_buffer(mesh.1.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 
-                render_pass.draw_indexed(0..mesh.num_indices as u32, 0, 0..1);
+                render_pass.draw_indexed(0..mesh.1.num_indices as u32, 0, 0..1);
             }
         }
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -399,6 +404,18 @@ pub async fn run() {
             event: DeviceEvent::MouseMotion { delta },
             ..
         } => state.player_controller.process_mouse(delta.0, delta.1),
+        Event::DeviceEvent {
+            event:
+                DeviceEvent::Button {
+                    button: 0,
+                    state: ElementState::Pressed,
+                },
+            ..
+        } => {
+            state
+                .player_controller
+                .process_click(&state.player, &mut state.world);
+        }
         Event::AboutToWait => {
             // RedrawRequested will only trigger once unless we manually
             // request it.
@@ -415,6 +432,18 @@ pub async fn run() {
                         let dt = now - last_render_time;
                         last_render_time = now;
                         state.update(dt);
+                        for dirt in &state.world.dirty {
+                            state.world.meshes.remove(dirt);
+                            state.world.meshes.insert(
+                                *dirt,
+                                terrain::mesher::get_mesh(
+                                    &state.world.chunks,
+                                    *dirt,
+                                    &state.device,
+                                ),
+                            );
+                        }
+                        state.world.dirty = Vec::new();
                         match state.render() {
                             Ok(_) => {}
                             // Reconfigure the surface if lost

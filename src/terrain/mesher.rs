@@ -163,21 +163,25 @@ fn outside_chunk(position: &Vector3<f32>) -> bool {
 }
 
 fn check_neighbor_at_edge_of_chunk(
-    chunks: &HashMap<[isize; 3], Chunk>,
-    chunk_pos: &[isize; 3],
+    chunks: &HashMap<Point3<isize>, Chunk>,
+    chunk_pos: &Point3<isize>,
     normal: &Vector3<f32>,
     neighbor: &Vector3<f32>,
 ) -> bool {
-    let neighbor_chunk = chunks.get(&[
-        chunk_pos[0] + normal.x as isize,
-        chunk_pos[1] + normal.y as isize,
-        chunk_pos[2] + normal.z as isize,
-    ]);
-    let relative_pos = (
+    let neighbor_chunk = chunks.get(
+        &[
+            chunk_pos.x + normal.x as isize,
+            chunk_pos.y + normal.y as isize,
+            chunk_pos.z + normal.z as isize,
+        ]
+        .into(),
+    );
+    let relative_pos = [
         (neighbor.x + CHUNK_SIZE as f32 * -normal.x) as u8,
         (neighbor.y + CHUNK_SIZE as f32 * -normal.y) as u8,
         (neighbor.z + CHUNK_SIZE as f32 * -normal.z) as u8,
-    );
+    ]
+    .into();
     let block_exists;
     if neighbor_chunk.is_some() {
         block_exists = neighbor_chunk.unwrap().contains_key(&relative_pos)
@@ -201,6 +205,7 @@ fn get_relative_chunk(position: &Vector3<f32>) -> Vector3<f32> {
         z: less_than_zero_z * -1.0 + larger_than_chunk_z,
     }
 }
+
 pub struct Mesh {
     //pub vertices: Vec<Vertex>,
     //pub indices: Vec<u32>,
@@ -211,8 +216,8 @@ pub struct Mesh {
 }
 
 pub fn get_mesh(
-    chunks: &HashMap<[isize; 3], Chunk>,
-    chunk_pos: [isize; 3],
+    chunks: &HashMap<Point3<isize>, Chunk>,
+    chunk_pos: Point3<isize>,
     device: &Device,
 ) -> Mesh {
     let mut vertices: Vec<Vertex> = Vec::new();
@@ -228,9 +233,9 @@ pub fn get_mesh(
             let neighbor_position;
 
             neighbor_position = Vector3 {
-                x: block.0 .0 as f32,
-                y: block.0 .1 as f32,
-                z: block.0 .2 as f32,
+                x: block.0.x as f32,
+                y: block.0.y as f32,
+                z: block.0.z as f32,
             } + normal;
 
             if outside_chunk(&neighbor_position) {
@@ -238,11 +243,14 @@ pub fn get_mesh(
                 {
                     continue;
                 }
-            } else if voxeldata.contains_key(&(
-                neighbor_position.x as u8,
-                neighbor_position.y as u8,
-                neighbor_position.z as u8,
-            )) {
+            } else if voxeldata.contains_key(
+                &[
+                    neighbor_position.x as u8,
+                    neighbor_position.y as u8,
+                    neighbor_position.z as u8,
+                ]
+                .into(),
+            ) {
                 continue;
             }
 
@@ -259,7 +267,8 @@ pub fn get_mesh(
                     ) as u8 as f32
                         * 0.33;
                 } else {
-                    occluders[i] = !voxeldata.contains_key(&(pos.x as u8, pos.y as u8, pos.z as u8))
+                    occluders[i] = !voxeldata
+                        .contains_key(&[pos.x as u8, pos.y as u8, pos.z as u8].into())
                         as u8 as f32
                         * 0.33;
                 }
@@ -271,7 +280,7 @@ pub fn get_mesh(
             vertices.extend(get_face(
                 normal,
                 texture,
-                [block.0 .0 as f32, block.0 .1 as f32, block.0 .2 as f32],
+                [block.0.x as f32, block.0.y as f32, block.0.z as f32],
                 occluders,
             ));
             indices.extend(offset_indices(off, flip));

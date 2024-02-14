@@ -60,8 +60,12 @@ var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
 
+struct FragmentOutput{
+    @location(0) color: vec4<f32>,
+}
+
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> FragmentOutput {
     var light: Light;
     light.direction = normalize(vec3<f32>(1.0, 3.0, 2.0));
     light.color = vec3<f32>(1.0, 1.0, 1.0);
@@ -73,5 +77,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
     var lighting =  (ambient * 0.3 + vec4(diffuse, 1.0) * 0.7);
 
-    return textureSample(t_diffuse, s_diffuse, in.tex_coords) * lighting * (in.ao*0.9+0.1);
+    var shaded = textureSample(t_diffuse, s_diffuse, in.tex_coords) * lighting * (in.ao*0.9+0.1);
+
+    var depth =in.clip_position.z / in.clip_position.w;
+    var uvx = (in.clip_position.x/40)-10;
+    var corrected_depth = sqrt(depth*depth + uvx*uvx);
+    var moved_depth = 2.0*max(corrected_depth/32.0 - 0.5, 0.0);
+    var fog = moved_depth*sqrt(moved_depth);
+    var fog_color =vec4(0.8,0.8,0.8,1.0);
+
+    var out: FragmentOutput;
+
+    out.color = (shaded + fog*fog_color)/(1+fog);
+
+    return out;
 }

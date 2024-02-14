@@ -1,10 +1,15 @@
-use cgmath::{InnerSpace, Rad, Vector3};
-use std::f32::consts::FRAC_PI_2;
+use cgmath::{
+    num_traits::{abs, Signed},
+    Angle, InnerSpace, Point3, Rad, Vector3,
+};
+use std::{cmp::min, f32::consts::FRAC_PI_2};
 use winit::{
     dpi::PhysicalPosition,
     event::{ElementState, MouseScrollDelta},
     keyboard::KeyCode,
 };
+
+use crate::terrain::World;
 
 use super::Camera;
 use super::Player;
@@ -24,6 +29,7 @@ pub struct PlayerController {
     scroll: f32,
     speed: f32,
     sensitivity: f32,
+    mine_block: bool,
 }
 
 impl PlayerController {
@@ -40,6 +46,7 @@ impl PlayerController {
             scroll: 0.0,
             speed,
             sensitivity,
+            mine_block: false,
         }
     }
 
@@ -89,6 +96,103 @@ impl PlayerController {
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
             MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
         };
+    }
+
+    pub fn process_click(&mut self, player: &Player, world: &mut World) {
+        let mut current = player.camera.position;
+        println!("{:.1}, {:.1}, {:.1}", current.x, current.y, current.z);
+
+        let xz_len = player.camera.pitch.cos();
+        let x = xz_len * player.camera.yaw.cos();
+        let y = player.camera.pitch.sin();
+        let z = xz_len * -player.camera.yaw.sin();
+
+        let x_step = 1.0 / x;
+        let y_step = 1.0 / y;
+        let z_step = 1.0 / z;
+
+        let mut x_iter: f32;
+        let mut y_iter: f32;
+        let mut z_iter: f32;
+        let mut dist = 0.0;
+
+        let xd;
+        let yd;
+        let zd;
+        if x.is_negative() {
+            x_iter = x_step - abs(current.x - current.x.ceil());
+            xd = -1.0;
+        } else {
+            x_iter = x_step - abs(current.x - current.x.floor());
+            xd = 1.0;
+        }
+        if y.is_negative() {
+            y_iter = y_step - abs(current.y - current.y.ceil());
+            yd = -1.0;
+        } else {
+            y_iter = y_step - abs(current.y - current.y.floor());
+            yd = 1.0;
+        }
+        if z.is_negative() {
+            z_iter = z_step - abs(current.z - current.z.ceil());
+            zd = -1.0;
+        } else {
+            z_iter = z_step - abs(current.z - current.z.floor());
+            zd = 1.0;
+        }
+
+        for i in 0..30 {
+            println!("{dist}");
+
+            let step_size;
+            let x_step_size = (x_iter / x_step) / abs(x);
+            let y_step_size = (y_iter / y_step) / abs(y);
+            let z_step_size = (z_iter / z_step) / abs(z);
+            if x_step_size < y_step_size && x_step_size < z_step_size {
+                // iterate x
+                step_size = x_step_size;
+                x_iter = x_step;
+                y_iter -= abs(x_step_size * y);
+                z_iter -= abs(x_step_size * z);
+                current += Vector3 {
+                    x: xd,
+                    y: 0.0,
+                    z: 0.0,
+                };
+            } else if y_step_size < z_step_size && y_step_size < x_step_size {
+                // iterate y
+                step_size = y_step_size;
+                y_iter = y_step;
+                x_iter -= abs(y_step_size * x);
+                z_iter -= abs(y_step_size * z);
+                current += Vector3 {
+                    x: 0.0,
+                    y: yd,
+                    z: 0.0,
+                };
+            } else {
+                // iterate z
+                step_size = z_step_size;
+                z_iter = z_step;
+                y_iter -= abs(z_step_size * y);
+                x_iter -= abs(z_step_size * x);
+                current += Vector3 {
+                    x: 0.0,
+                    y: 0.0,
+                    z: zd,
+                };
+            }
+
+            dist += abs(step_size);
+            if dist > 10.0 {
+                break;
+            }
+            if world.block_exists(current) {
+                world.remove_block(current);
+                break;
+            }
+        }
+        println!("{:.1}, {:.1}, {:.1}", current.x, current.y, current.z);
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: f32) {
