@@ -106,25 +106,41 @@ impl PlayerController {
         println!("{:.1}, {:.1}, {:.1}", current.x, current.y, current.z);
 
         let xz_len = player.camera.pitch.cos();
-        let x = xz_len * player.camera.yaw.cos();
-        let y = player.camera.pitch.sin();
-        let z = xz_len * player.camera.yaw.sin();
+        let x = 0.00001 + xz_len * player.camera.yaw.cos();
+        let y = 0.00001 + player.camera.pitch.sin();
+        let z = 0.00001 + xz_len * player.camera.yaw.sin();
 
         let direction = Vector3 { x, y, z };
         println!("{}", direction.magnitude());
-        let xn = direction.x.is_negative() as u8 as f32;
-        let yn = direction.y.is_negative() as u8 as f32;
-        let zn = direction.z.is_negative() as u8 as f32;
 
-        for i in 0..60 {
-            let step_size_x = abs((current.x + (xn - current.x.floor())) / direction.x);
-            println!("{step_size_x}");
-            let step_size_y = abs((current.y + (yn - current.y.floor())) / direction.y);
-            println!("{step_size_y}");
-            let step_size_z = abs((current.z + (zn - current.z.floor())) / direction.z);
-            println!("{step_size_z}");
-            let step_size = step_size_x.min(step_size_y).min(step_size_z);
+        let mut dist = 0.0;
+        loop {
+            let mut step_size_x = current.x - current.x.floor() + 0.0001;
+            if direction.x.is_negative() {
+                step_size_x = 1.0 - step_size_x;
+            }
+            let mut step_size_y = current.y - current.y.floor() + 0.0001;
+            if direction.y.is_negative() {
+                step_size_y = 1.0 - step_size_y;
+            }
+            let mut step_size_z = current.z - current.z.floor() + 0.0001;
+            if direction.z.is_negative() {
+                step_size_z = 1.0 - step_size_z;
+            }
+            let step_x = step_size_x / abs(direction.x);
+            let step_y = step_size_y / abs(direction.y);
+            let step_z = step_size_z / abs(direction.z);
+            let step_size = step_x.min(step_y).min(step_z) * 1.000001;
+            println!("--------");
+            println!("{step_x}");
+            println!("{step_y}");
+            println!("{step_z}");
+            println!("{step_size}");
             current += direction * step_size;
+            dist += step_size;
+            if dist > 16.0 {
+                break;
+            }
             if world.block_exists(current) {
                 world.remove_block(current);
                 break;

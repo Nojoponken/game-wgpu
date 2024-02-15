@@ -64,7 +64,7 @@ impl Player {
         self.camera.position += ((self.position
             + Vector3 {
                 x: 0.0,
-                y: self.height - 0.3,
+                y: self.height * 0.8,
                 z: 0.0,
             })
             - self.camera.position);
