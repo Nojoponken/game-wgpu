@@ -114,27 +114,14 @@ impl PlayerController {
 
         let mut dist = 0.0;
         loop {
-            let x_dist;
-            let y_dist;
-            let z_dist;
+            let x_dist = (direction.x.is_positive() as u8 as f32 - Self::modulo(current.x, 1.0))
+                / direction.x;
+            let y_dist = (direction.y.is_positive() as u8 as f32 - Self::modulo(current.y, 1.0))
+                / direction.y;
+            let z_dist = (direction.z.is_positive() as u8 as f32 - Self::modulo(current.z, 1.0))
+                / direction.z;
 
-            if direction.x.is_positive() {
-                x_dist = (1.0 - Self::modulo(current.x, 1.0)) / abs(direction.x);
-            } else {
-                x_dist = (Self::modulo(current.x, 1.0)) / abs(direction.x);
-            }
-            if direction.y.is_positive() {
-                y_dist = (1.0 - Self::modulo(current.y, 1.0)) / abs(direction.y);
-            } else {
-                y_dist = (Self::modulo(current.y, 1.0)) / abs(direction.y);
-            }
-            if direction.z.is_positive() {
-                z_dist = (1.0 - Self::modulo(current.z, 1.0)) / abs(direction.z);
-            } else {
-                z_dist = (Self::modulo(current.z, 1.0)) / abs(direction.z);
-            }
-
-            let step_size = x_dist.min(y_dist).min(z_dist) + 0.00001;
+            let step_size = x_dist.min(y_dist).min(z_dist) + 0.001; // there is a bug that is hidden by this 0.001 where you lag spike when breaking blocks at certain angles
 
             current += direction * step_size;
             dist += step_size;
