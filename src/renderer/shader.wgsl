@@ -79,7 +79,7 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
 
     var shaded = textureSample(t_diffuse, s_diffuse, in.tex_coords) * lighting * (in.ao*0.9+0.1);
 
-    var depth =in.clip_position.z / in.clip_position.w;
+    var depth = in.clip_position.z / in.clip_position.w;
     var uvx = (in.clip_position.x/40)-10;
     var corrected_depth = sqrt(depth*depth + uvx*uvx);
     var moved_depth = 2.0*max(corrected_depth/32.0 - 0.5, 0.0);

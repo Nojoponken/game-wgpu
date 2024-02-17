@@ -103,39 +103,39 @@ impl PlayerController {
     }
     pub fn process_click(&mut self, player: &Player, world: &mut World) {
         let mut current = player.camera.position;
-        println!("{:.1}, {:.1}, {:.1}", current.x, current.y, current.z);
 
         let xz_len = player.camera.pitch.cos();
-        let x = 0.00001 + xz_len * player.camera.yaw.cos();
-        let y = 0.00001 + player.camera.pitch.sin();
-        let z = 0.00001 + xz_len * player.camera.yaw.sin();
 
-        let direction = Vector3 { x, y, z };
-        println!("{}", direction.magnitude());
+        let direction = Vector3 {
+            x: xz_len * player.camera.yaw.cos(),
+            y: player.camera.pitch.sin(),
+            z: xz_len * player.camera.yaw.sin(),
+        };
 
         let mut dist = 0.0;
         loop {
-            let mut step_size_x = current.x - current.x.floor() + 0.0001;
-            if direction.x.is_negative() {
-                step_size_x = 1.0 - step_size_x;
+            let x_dist;
+            let y_dist;
+            let z_dist;
+
+            if direction.x.is_positive() {
+                x_dist = (1.0 - Self::modulo(current.x, 1.0)) / abs(direction.x);
+            } else {
+                x_dist = (Self::modulo(current.x, 1.0)) / abs(direction.x);
             }
-            let mut step_size_y = current.y - current.y.floor() + 0.0001;
-            if direction.y.is_negative() {
-                step_size_y = 1.0 - step_size_y;
+            if direction.y.is_positive() {
+                y_dist = (1.0 - Self::modulo(current.y, 1.0)) / abs(direction.y);
+            } else {
+                y_dist = (Self::modulo(current.y, 1.0)) / abs(direction.y);
             }
-            let mut step_size_z = current.z - current.z.floor() + 0.0001;
-            if direction.z.is_negative() {
-                step_size_z = 1.0 - step_size_z;
+            if direction.z.is_positive() {
+                z_dist = (1.0 - Self::modulo(current.z, 1.0)) / abs(direction.z);
+            } else {
+                z_dist = (Self::modulo(current.z, 1.0)) / abs(direction.z);
             }
-            let step_x = step_size_x / abs(direction.x);
-            let step_y = step_size_y / abs(direction.y);
-            let step_z = step_size_z / abs(direction.z);
-            let step_size = step_x.min(step_y).min(step_z) * 1.000001;
-            println!("--------");
-            println!("{step_x}");
-            println!("{step_y}");
-            println!("{step_z}");
-            println!("{step_size}");
+
+            let step_size = x_dist.min(y_dist).min(z_dist) + 0.00001;
+
             current += direction * step_size;
             dist += step_size;
             if dist > 16.0 {
@@ -146,7 +146,6 @@ impl PlayerController {
                 break;
             }
         }
-        println!("{:.1}, {:.1}, {:.1}", current.x, current.y, current.z);
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: f32) {

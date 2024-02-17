@@ -17,7 +17,7 @@ use crate::{
 mod camera;
 mod texture;
 
-const WORLD_SIZE: isize = 8;
+const WORLD_SIZE: isize = 4;
 
 struct State<'w> {
     surface: wgpu::Surface<'w>,
