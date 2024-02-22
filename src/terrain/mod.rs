@@ -88,7 +88,7 @@ pub struct World {
 
 impl World {
     pub fn new(world_size: isize, device: &Device) -> Self {
-        let perlin = Fbm::<Perlin>::new(1);
+        let perlin = Fbm::<Perlin>::new(696969);
 
         let mut chunks = HashMap::new();
         chunks.insert([0, 0, 0].into(), HashMap::new());

@@ -48,7 +48,7 @@ impl Player {
             },
             camera: Camera::new(position, Rad(0.0), Rad(0.0)),
             height: 2.8,
-            width: 1.8,
+            width: 1.4,
         }
     }
     pub fn update(&mut self, controller: &mut PlayerController, dt: Duration, world: &World) {
