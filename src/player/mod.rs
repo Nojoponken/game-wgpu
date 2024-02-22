@@ -60,14 +60,14 @@ impl Player {
         self.velocity.z *= 0.9;
         self.position += self.velocity;
 
-        collision::handle_collision(self, world);
-        self.camera.position += ((self.position
+        collision::handle_collision(self, world, dt);
+        self.camera.position += (self.position
             + Vector3 {
                 x: 0.0,
                 y: self.height * 0.8,
                 z: 0.0,
             })
-            - self.camera.position);
+            - self.camera.position;
         controller.update_camera(&mut self.camera, dt);
     }
 }

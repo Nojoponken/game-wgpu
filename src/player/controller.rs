@@ -29,7 +29,6 @@ pub struct PlayerController {
     scroll: f32,
     speed: f32,
     sensitivity: f32,
-    mine_block: bool,
 }
 
 impl PlayerController {
@@ -46,7 +45,6 @@ impl PlayerController {
             scroll: 0.0,
             speed,
             sensitivity,
-            mine_block: false,
         }
     }
 
@@ -101,7 +99,7 @@ impl PlayerController {
     fn modulo(a: f32, b: f32) -> f32 {
         ((a % b) + b) % b
     }
-    pub fn process_click(&mut self, player: &Player, world: &mut World) {
+    pub fn process_click(&mut self, player: &Player, world: &mut World, place: bool) {
         let mut current = player.camera.position;
 
         let xz_len = player.camera.pitch.cos();
@@ -123,14 +121,24 @@ impl PlayerController {
 
             let step_size = x_dist.min(y_dist).min(z_dist) + 0.001; // there is a bug that is hidden by this 0.001 where you lag spike when breaking blocks at certain angles
 
-            current += direction * step_size;
             dist += step_size;
             if dist > 16.0 {
                 break;
             }
-            if world.block_exists(current) {
-                world.remove_block(current);
-                break;
+
+            if place {
+                if world.block_exists(current + direction * step_size) {
+                    world.add_block(current, 1);
+                    break;
+                }
+            }
+            current += direction * step_size;
+
+            if !place {
+                if world.block_exists(current) {
+                    world.remove_block(current);
+                    break;
+                }
             }
         }
     }

@@ -1,7 +1,7 @@
 use self::mesher::{get_mesh, Mesh};
 
 use super::block::Block;
-use cgmath::{num_traits::abs, Point3};
+use cgmath::{num_traits::abs, Point3, Vector3};
 use image::buffer;
 use noise::{utils::*, Fbm, Perlin};
 use std::collections::HashMap;
@@ -150,12 +150,123 @@ impl World {
         return false;
     }
 
+    fn update_dirty(&mut self, chunk_pos: Point3<isize>, block_pos: Point3<u8>) {
+        self.dirty.push(chunk_pos);
+
+        let mut x_dirt = 0;
+        let mut y_dirt = 0;
+        let mut z_dirt = 0;
+
+        if block_pos.x == CHUNK_SIZE as u8 - 1 {
+            x_dirt = 1;
+        } else if block_pos.x == 0 as u8 {
+            x_dirt = -1;
+        }
+        if block_pos.y == CHUNK_SIZE as u8 - 1 {
+            y_dirt = 1;
+        } else if block_pos.y == 0 as u8 {
+            y_dirt = -1;
+        }
+        if block_pos.z == CHUNK_SIZE as u8 - 1 {
+            z_dirt = 1;
+        } else if block_pos.z == 0 as u8 {
+            z_dirt = -1;
+        }
+
+        if x_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: x_dirt,
+                        y: 0,
+                        z: 0,
+                    },
+            )
+        }
+        if y_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: 0,
+                        y: y_dirt,
+                        z: 0,
+                    },
+            )
+        }
+        if z_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: 0,
+                        y: 0,
+                        z: z_dirt,
+                    },
+            )
+        }
+
+        if x_dirt != 0 && y_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: x_dirt,
+                        y: y_dirt,
+                        z: 0,
+                    },
+            )
+        }
+        if x_dirt != 0 && z_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: x_dirt,
+                        y: 0,
+                        z: z_dirt,
+                    },
+            )
+        }
+        if z_dirt != 0 && y_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: 0,
+                        y: y_dirt,
+                        z: z_dirt,
+                    },
+            )
+        }
+
+        if x_dirt != 0 && y_dirt != 0 && z_dirt != 0 {
+            self.dirty.push(
+                chunk_pos
+                    + Vector3 {
+                        x: x_dirt,
+                        y: y_dirt,
+                        z: z_dirt,
+                    },
+            )
+        }
+    }
+    pub fn add_block(&mut self, position: Point3<f32>, id: u8) {
+        let (chunk_pos, block_pos) = self.chunk_block_from_global(position);
+
+        if !self.block_exists(position) {
+            self.chunks.get_mut(&chunk_pos).unwrap().insert(
+                block_pos,
+                Block {
+                    block_id: id,
+                    block_state: 0,
+                },
+            );
+            self.update_dirty(chunk_pos, block_pos);
+        }
+    }
+
     pub fn remove_block(&mut self, position: Point3<f32>) {
         let (chunk_pos, block_pos) = self.chunk_block_from_global(position);
 
         if self.block_exists(position) {
             self.chunks.get_mut(&chunk_pos).unwrap().remove(&block_pos);
-            self.dirty.push(chunk_pos);
+            self.update_dirty(chunk_pos, block_pos);
         }
     }
 

@@ -36,7 +36,6 @@ struct State<'w> {
     camera_uniform: camera::CameraUniform,
     camera_buffer: Buffer,
     camera_bind_group: wgpu::BindGroup,
-    mouse_pressed: bool,
     world: terrain::World,
     // Window last for safety
     window: Window,
@@ -264,7 +263,6 @@ impl<'w> State<'w> {
             camera_uniform,
             camera_buffer,
             camera_bind_group,
-            mouse_pressed: false,
             world,
         }
     }
@@ -304,10 +302,7 @@ impl<'w> State<'w> {
                 button: MouseButton::Left,
                 state,
                 ..
-            } => {
-                self.mouse_pressed = *state == ElementState::Pressed;
-                true
-            }
+            } => true,
             _ => false,
         }
     }
@@ -414,7 +409,19 @@ pub async fn run() {
         } => {
             state
                 .player_controller
-                .process_click(&state.player, &mut state.world);
+                .process_click(&state.player, &mut state.world, false);
+        }
+        Event::DeviceEvent {
+            event:
+                DeviceEvent::Button {
+                    button: 1,
+                    state: ElementState::Pressed,
+                },
+            ..
+        } => {
+            state
+                .player_controller
+                .process_click(&state.player, &mut state.world, true);
         }
         Event::AboutToWait => {
             // RedrawRequested will only trigger once unless we manually
