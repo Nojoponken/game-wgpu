@@ -6,7 +6,7 @@ pub struct Block {
     pub block_state: u8,
 }
 
-pub fn get_texture(block_id: u8, normal: [f32; 3]) -> Atlas {
+pub fn get_texture(block_id: u8, normal: [i8; 3]) -> Atlas {
     enum Face {
         Top,
         Bottom,
@@ -16,11 +16,11 @@ pub fn get_texture(block_id: u8, normal: [f32; 3]) -> Atlas {
         East,
     }
     let face = match normal {
-        [-1.0, 0.0, 0.0] => Face::West,
-        [1.0, 0.0, 0.0] => Face::East,
-        [0.0, 0.0, -1.0] => Face::North,
-        [0.0, 0.0, 1.0] => Face::South,
-        [0.0, -1.0, 0.0] => Face::Bottom,
+        [-1, 0, 0] => Face::West,
+        [1, 0, 0] => Face::East,
+        [0, 0, -1] => Face::North,
+        [0, 0, 1] => Face::South,
+        [0, -1, 0] => Face::Bottom,
         _ => Face::Top,
     };
     match block_id {
@@ -32,6 +32,16 @@ pub fn get_texture(block_id: u8, normal: [f32; 3]) -> Atlas {
         2 => Atlas::Dirt,
         3 => Atlas::Stone,
         4 => Atlas::Sand,
+        5 => Atlas::StoneBrick,
+        6 => Atlas::MossyBrick,
+        7 => Atlas::IronBars,
+        8 => Atlas::Plank,
+        9 => Atlas::Glass,
+        10 => match face {
+            Face::Top => Atlas::LogTop,
+            Face::Bottom => Atlas::LogTop,
+            _ => Atlas::LogSide,
+        },
         0 => Atlas::Water,
         _ => Atlas::Unknown,
     }

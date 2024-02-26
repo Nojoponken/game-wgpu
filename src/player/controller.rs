@@ -29,6 +29,7 @@ pub struct PlayerController {
     scroll: f32,
     speed: f32,
     sensitivity: f32,
+    picked_block: u8,
 }
 
 impl PlayerController {
@@ -45,6 +46,7 @@ impl PlayerController {
             scroll: 0.0,
             speed,
             sensitivity,
+            picked_block: 1,
         }
     }
 
@@ -77,6 +79,46 @@ impl PlayerController {
             }
             KeyCode::ShiftLeft => {
                 self.amount_down = amount;
+                true
+            }
+            KeyCode::Digit1 => {
+                self.picked_block = 1;
+                true
+            }
+            KeyCode::Digit2 => {
+                self.picked_block = 2;
+                true
+            }
+            KeyCode::Digit3 => {
+                self.picked_block = 3;
+                true
+            }
+            KeyCode::Digit4 => {
+                self.picked_block = 4;
+                true
+            }
+            KeyCode::Digit5 => {
+                self.picked_block = 5;
+                true
+            }
+            KeyCode::Digit6 => {
+                self.picked_block = 6;
+                true
+            }
+            KeyCode::Digit7 => {
+                self.picked_block = 7;
+                true
+            }
+            KeyCode::Digit8 => {
+                self.picked_block = 8;
+                true
+            }
+            KeyCode::Digit9 => {
+                self.picked_block = 9;
+                true
+            }
+            KeyCode::Digit0 => {
+                self.picked_block = 10;
                 true
             }
             _ => false,
@@ -128,7 +170,7 @@ impl PlayerController {
 
             if place {
                 if world.block_exists(current + direction * step_size) {
-                    world.add_block(current, 1);
+                    world.add_block(current, self.picked_block);
                     break;
                 }
             }

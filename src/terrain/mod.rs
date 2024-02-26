@@ -12,15 +12,15 @@ pub mod vertex;
 
 pub const CHUNK_SIZE: usize = 16;
 
-pub type Chunk = HashMap<Point3<u8>, Block>;
+pub type Chunk = HashMap<Point3<i8>, Block>;
 
 fn gen_chunk(
     chunk_x: isize,
     chunk_y: isize,
     chunk_z: isize,
     perlin: &Fbm<Perlin>,
-) -> HashMap<Point3<u8>, Block> {
-    let mut voxels: HashMap<Point3<u8>, Block> = HashMap::new();
+) -> HashMap<Point3<i8>, Block> {
+    let mut voxels: HashMap<Point3<i8>, Block> = HashMap::new();
 
     let k = 0.125;
     let k2 = k * 2.0;
@@ -54,7 +54,7 @@ fn gen_chunk(
                 let depth = val1 * 4.0 + val2 * 8.0 - global_y as f64 + 0.0;
 
                 if depth < 0.0 && global_y < 0 {
-                    generated_id = 0;
+                    generated_id = 9;
                 } else if depth < 0.0 {
                     continue;
                 } else if depth < 1.0 && global_y < 2 {
@@ -68,7 +68,7 @@ fn gen_chunk(
                 }
 
                 voxels.insert(
-                    [x as u8, y as u8, z as u8].into(),
+                    [x as i8, y as i8, z as i8].into(),
                     Block {
                         block_id: generated_id as u8,
                         block_state: 0,
@@ -139,37 +139,35 @@ impl World {
         if !self.chunks.contains_key(&chunk_pos) {
             return false;
         }
-        if self
-            .chunks
-            .get(&chunk_pos)
-            .unwrap()
-            .contains_key(&relative_pos)
-        {
-            return true;
+
+        let chunk = self.chunks.get(&chunk_pos).unwrap();
+        if !chunk.contains_key(&relative_pos) {
+            return false;
         }
-        return false;
+
+        true
     }
 
-    fn update_dirty(&mut self, chunk_pos: Point3<isize>, block_pos: Point3<u8>) {
+    fn update_dirty(&mut self, chunk_pos: Point3<isize>, block_pos: Point3<i8>) {
         self.dirty.push(chunk_pos);
 
         let mut x_dirt = 0;
         let mut y_dirt = 0;
         let mut z_dirt = 0;
 
-        if block_pos.x == CHUNK_SIZE as u8 - 1 {
+        if block_pos.x == CHUNK_SIZE as i8 - 1 {
             x_dirt = 1;
-        } else if block_pos.x == 0 as u8 {
+        } else if block_pos.x == 0 as i8 {
             x_dirt = -1;
         }
-        if block_pos.y == CHUNK_SIZE as u8 - 1 {
+        if block_pos.y == CHUNK_SIZE as i8 - 1 {
             y_dirt = 1;
-        } else if block_pos.y == 0 as u8 {
+        } else if block_pos.y == 0 as i8 {
             y_dirt = -1;
         }
-        if block_pos.z == CHUNK_SIZE as u8 - 1 {
+        if block_pos.z == CHUNK_SIZE as i8 - 1 {
             z_dirt = 1;
-        } else if block_pos.z == 0 as u8 {
+        } else if block_pos.z == 0 as i8 {
             z_dirt = -1;
         }
 
@@ -270,7 +268,7 @@ impl World {
         }
     }
 
-    fn chunk_block_from_global(&self, position: Point3<f32>) -> (Point3<isize>, Point3<u8>) {
+    fn chunk_block_from_global(&self, position: Point3<f32>) -> (Point3<isize>, Point3<i8>) {
         let chunk_pos = [
             (position.x / CHUNK_SIZE as f32).floor() as isize,
             (position.y / CHUNK_SIZE as f32).floor() as isize,
@@ -278,9 +276,9 @@ impl World {
         ]
         .into();
         let block_pos = [
-            (((position.x % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
-            (((position.y % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
-            (((position.z % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as u8,
+            (((position.x % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as i8,
+            (((position.y % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as i8,
+            (((position.z % CHUNK_SIZE as f32) + CHUNK_SIZE as f32) % CHUNK_SIZE as f32) as i8,
         ]
         .into();
         (chunk_pos, block_pos)

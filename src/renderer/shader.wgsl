@@ -70,14 +70,14 @@ fn fs_main(in: VertexOutput) -> FragmentOutput {
     light.direction = normalize(vec3<f32>(1.0, 3.0, 2.0));
     light.color = vec3<f32>(1.0, 1.0, 1.0);
 
-    var ambient = vec4(1.0, 1.0, 1.0, 1.0);
+    var ambient = vec3(1.0, 1.0, 1.0);
 
     var diffuseStrength = max(dot(in.normal, light.direction), 0.0);
     var diffuse = diffuseStrength * light.color;
 
-    var lighting =  (ambient * 0.3 + vec4(diffuse, 1.0) * 0.7);
+    var lighting =  (ambient * 0.3 + diffuse * 0.7) * (in.ao*0.9+0.1);
 
-    var shaded = textureSample(t_diffuse, s_diffuse, in.tex_coords) * lighting * (in.ao*0.9+0.1);
+    var shaded = textureSample(t_diffuse, s_diffuse, in.tex_coords) * vec4(lighting, 1.0) ;
 
     var depth = in.clip_position.z / in.clip_position.w;
     var uvx = (in.clip_position.x/40)-10;
