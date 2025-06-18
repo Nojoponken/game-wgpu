@@ -68,10 +68,15 @@ impl<'w> State<'w> {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    required_features: wgpu::Features::union(
-                        wgpu::Features::POLYGON_MODE_LINE,
-                        wgpu::Features::DEPTH_CLIP_CONTROL,
+                    required_features: wgpu::Features::all().difference(
+                        wgpu::Features::TEXTURE_COMPRESSION_ETC2
+                            .union(wgpu::Features::TEXTURE_COMPRESSION_ASTC)
+                            .union(wgpu::Features::TEXTURE_COMPRESSION_ASTC_HDR)
+                            .union(wgpu::Features::VERTEX_ATTRIBUTE_64BIT)
+                            .union(wgpu::Features::SHADER_EARLY_DEPTH_TEST),
                     ),
+                    //wgpu::Features::POLYGON_MODE_LINE
+                    //   .union(wgpu::Features::DEPTH_CLIP_CONTROL),
                     required_limits: wgpu::Limits::default(),
                     label: None,
                 },
@@ -95,8 +100,8 @@ impl<'w> State<'w> {
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::Fifo, //surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
+            present_mode: wgpu::PresentMode::AutoVsync, //surface_caps.present_modes[0],
+            alpha_mode: wgpu::CompositeAlphaMode::Opaque, // surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -211,7 +216,7 @@ impl<'w> State<'w> {
                 targets: &[Some(wgpu::ColorTargetState {
                     // 4.
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
             }),
@@ -237,7 +242,7 @@ impl<'w> State<'w> {
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
-                alpha_to_coverage_enabled: true,
+                alpha_to_coverage_enabled: false,
             },
             multiview: None,
         });

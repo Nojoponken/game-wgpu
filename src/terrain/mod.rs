@@ -54,7 +54,7 @@ fn gen_chunk(
                 let depth = val1 * 4.0 + val2 * 8.0 - global_y as f64 + 0.0;
 
                 if depth < 0.0 && global_y < 0 {
-                    generated_id = 9;
+                    generated_id = 0;
                 } else if depth < 0.0 {
                     continue;
                 } else if depth < 1.0 && global_y < 2 {

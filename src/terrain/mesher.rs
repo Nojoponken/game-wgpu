@@ -209,7 +209,10 @@ pub fn block_opaque(
 
     let block = chunk.unwrap().get(relative_pos);
     if block.is_some() {
-        if block.unwrap().block_id == 7 || block.unwrap().block_id == 9 {
+        if block.unwrap().block_id == 7
+            || block.unwrap().block_id == 9
+            || block.unwrap().block_id == 0
+        {
             return block.unwrap().block_id == self_id;
         }
     } else {
